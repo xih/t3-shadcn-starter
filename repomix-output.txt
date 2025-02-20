@@ -1,0 +1,2354 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+================================================================
+File Summary
+================================================================
+
+Purpose:
+--------
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+
+File Format:
+------------
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Multiple file entries, each consisting of:
+  a. A separator line (================)
+  b. The file path (File: path/to/file)
+  c. Another separator line
+  d. The full contents of the file
+  e. A blank line
+
+Usage Guidelines:
+-----------------
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+
+Notes:
+------
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+
+Additional Info:
+----------------
+
+================================================================
+Directory Structure
+================================================================
+prisma/
+  schema.prisma
+src/
+  app/
+    _components/
+      post.tsx
+    api/
+      auth/
+        [...nextauth]/
+          route.ts
+      trpc/
+        [trpc]/
+          route.ts
+    layout.tsx
+    page.tsx
+  components/
+    ui/
+      card.tsx
+      scroll-area.tsx
+      table.tsx
+  lib/
+    utils.ts
+  server/
+    api/
+      routers/
+        post.ts
+      root.ts
+      trpc.ts
+    auth/
+      config.ts
+      index.ts
+    db.ts
+  styles/
+    globals.css
+  trpc/
+    query-client.ts
+    react.tsx
+    server.ts
+  env.js
+.env-e
+.env.example
+.eslintrc.cjs
+.gitignore
+components.json
+next.config.js
+package.json
+postcss.config.js
+prettier.config.js
+prompt_plan.md
+README.md
+spec.md
+start-database.sh
+tailwind.config.ts
+todo.md
+tsconfig.json
+
+================================================================
+Files
+================================================================
+
+================
+File: prisma/schema.prisma
+================
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+    // NOTE: When using mysql or sqlserver, uncomment the @db.Text annotations in model Account below
+    // Further reading:
+    // https://next-auth.js.org/adapters/prisma#create-the-prisma-schema
+    // https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#string
+    url      = env("DATABASE_URL")
+}
+
+model Post {
+    id        Int      @id @default(autoincrement())
+    name      String
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    createdBy   User   @relation(fields: [createdById], references: [id])
+    createdById String
+
+    @@index([name])
+}
+
+// Necessary for Next auth
+model Account {
+    id                       String  @id @default(cuid())
+    userId                   String
+    type                     String
+    provider                 String
+    providerAccountId        String
+    refresh_token            String? // @db.Text
+    access_token             String? // @db.Text
+    expires_at               Int?
+    token_type               String?
+    scope                    String?
+    id_token                 String? // @db.Text
+    session_state            String?
+    user                     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+    refresh_token_expires_in Int?
+
+    @@unique([provider, providerAccountId])
+}
+
+model Session {
+    id           String   @id @default(cuid())
+    sessionToken String   @unique
+    userId       String
+    expires      DateTime
+    user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+    id            String    @id @default(cuid())
+    name          String?
+    email         String?   @unique
+    emailVerified DateTime?
+    image         String?
+    accounts      Account[]
+    sessions      Session[]
+    posts         Post[]
+}
+
+model VerificationToken {
+    identifier String
+    token      String   @unique
+    expires    DateTime
+
+    @@unique([identifier, token])
+}
+
+================
+File: src/app/_components/post.tsx
+================
+"use client";
+
+import { useState } from "react";
+
+import { api } from "~/trpc/react";
+
+export function LatestPost() {
+  const [latestPost] = api.post.getLatest.useSuspenseQuery();
+
+  const utils = api.useUtils();
+  const [name, setName] = useState("");
+  const createPost = api.post.create.useMutation({
+    onSuccess: async () => {
+      await utils.post.invalidate();
+      setName("");
+    },
+  });
+
+  return (
+    <div className="w-full max-w-xs">
+      {latestPost ? (
+        <p className="truncate">Your most recent post: {latestPost.name}</p>
+      ) : (
+        <p>You have no posts yet.</p>
+      )}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          createPost.mutate({ name });
+        }}
+        className="flex flex-col gap-2"
+      >
+        <input
+          type="text"
+          placeholder="Title"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="w-full rounded-full px-4 py-2 text-black"
+        />
+        <button
+          type="submit"
+          className="rounded-full bg-white/10 px-10 py-3 font-semibold transition hover:bg-white/20"
+          disabled={createPost.isPending}
+        >
+          {createPost.isPending ? "Submitting..." : "Submit"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+================
+File: src/app/api/auth/[...nextauth]/route.ts
+================
+import { handlers } from "~/server/auth";
+
+export const { GET, POST } = handlers;
+
+================
+File: src/app/api/trpc/[trpc]/route.ts
+================
+import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
+import { type NextRequest } from "next/server";
+
+import { env } from "~/env";
+import { appRouter } from "~/server/api/root";
+import { createTRPCContext } from "~/server/api/trpc";
+
+/**
+ * This wraps the `createTRPCContext` helper and provides the required context for the tRPC API when
+ * handling a HTTP request (e.g. when you make requests from Client Components).
+ */
+const createContext = async (req: NextRequest) => {
+  return createTRPCContext({
+    headers: req.headers,
+  });
+};
+
+const handler = (req: NextRequest) =>
+  fetchRequestHandler({
+    endpoint: "/api/trpc",
+    req,
+    router: appRouter,
+    createContext: () => createContext(req),
+    onError:
+      env.NODE_ENV === "development"
+        ? ({ path, error }) => {
+            console.error(
+              `❌ tRPC failed on ${path ?? "<no-path>"}: ${error.message}`
+            );
+          }
+        : undefined,
+  });
+
+export { handler as GET, handler as POST };
+
+================
+File: src/app/layout.tsx
+================
+import "~/styles/globals.css";
+
+import { GeistSans } from "geist/font/sans";
+import { type Metadata } from "next";
+
+import { TRPCReactProvider } from "~/trpc/react";
+
+export const metadata: Metadata = {
+  title: "Create T3 App",
+  description: "Generated by create-t3-app",
+  icons: [{ rel: "icon", url: "/favicon.ico" }],
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
+  return (
+    <html lang="en" className={`${GeistSans.variable}`}>
+      <body>
+        <TRPCReactProvider>{children}</TRPCReactProvider>
+      </body>
+    </html>
+  );
+}
+
+================
+File: src/app/page.tsx
+================
+import Link from "next/link";
+
+import { LatestPost } from "~/app/_components/post";
+import { auth } from "~/server/auth";
+import { api, HydrateClient } from "~/trpc/server";
+
+export default async function Home() {
+  const hello = await api.post.hello({ text: "from tRPC" });
+  const session = await auth();
+
+  if (session?.user) {
+    void api.post.getLatest.prefetch();
+  }
+
+  return (
+    <HydrateClient>
+      <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-[#2e026d] to-[#15162c] text-white">
+        <div className="container flex flex-col items-center justify-center gap-12 px-4 py-16">
+          <h1 className="text-5xl font-extrabold tracking-tight sm:text-[5rem]">
+            Create <span className="text-[hsl(280,100%,70%)]">T3</span> App
+          </h1>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-8">
+            <Link
+              className="flex max-w-xs flex-col gap-4 rounded-xl bg-white/10 p-4 hover:bg-white/20"
+              href="https://create.t3.gg/en/usage/first-steps"
+              target="_blank"
+            >
+              <h3 className="text-2xl font-bold">First Steps →</h3>
+              <div className="text-lg">
+                Just the basics - Everything you need to know to set up your
+                database and authentication.
+              </div>
+            </Link>
+            <Link
+              className="flex max-w-xs flex-col gap-4 rounded-xl bg-white/10 p-4 hover:bg-white/20"
+              href="https://create.t3.gg/en/introduction"
+              target="_blank"
+            >
+              <h3 className="text-2xl font-bold">Documentation →</h3>
+              <div className="text-lg">
+                Learn more about Create T3 App, the libraries it uses, and how
+                to deploy it.
+              </div>
+            </Link>
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <p className="text-2xl text-white">
+              {hello ? hello.greeting : "Loading tRPC query..."}
+            </p>
+
+            <div className="flex flex-col items-center justify-center gap-4">
+              <p className="text-center text-2xl text-white">
+                {session && <span>Logged in as {session.user?.name}</span>}
+              </p>
+              <Link
+                href={session ? "/api/auth/signout" : "/api/auth/signin"}
+                className="rounded-full bg-white/10 px-10 py-3 font-semibold no-underline transition hover:bg-white/20"
+              >
+                {session ? "Sign out" : "Sign in"}
+              </Link>
+            </div>
+          </div>
+
+          {session?.user && <LatestPost />}
+        </div>
+      </main>
+    </HydrateClient>
+  );
+}
+
+================
+File: src/components/ui/card.tsx
+================
+import * as React from "react"
+
+import { cn } from "~/lib/utils"
+
+const Card = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn(
+      "rounded-xl border bg-card text-card-foreground shadow",
+      className
+    )}
+    {...props}
+  />
+))
+Card.displayName = "Card"
+
+const CardHeader = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn("flex flex-col space-y-1.5 p-6", className)}
+    {...props}
+  />
+))
+CardHeader.displayName = "CardHeader"
+
+const CardTitle = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn("font-semibold leading-none tracking-tight", className)}
+    {...props}
+  />
+))
+CardTitle.displayName = "CardTitle"
+
+const CardDescription = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn("text-sm text-muted-foreground", className)}
+    {...props}
+  />
+))
+CardDescription.displayName = "CardDescription"
+
+const CardContent = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div ref={ref} className={cn("p-6 pt-0", className)} {...props} />
+))
+CardContent.displayName = "CardContent"
+
+const CardFooter = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn("flex items-center p-6 pt-0", className)}
+    {...props}
+  />
+))
+CardFooter.displayName = "CardFooter"
+
+export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }
+
+================
+File: src/components/ui/scroll-area.tsx
+================
+"use client"
+
+import * as React from "react"
+import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area"
+
+import { cn } from "~/lib/utils"
+
+const ScrollArea = React.forwardRef<
+  React.ElementRef<typeof ScrollAreaPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root>
+>(({ className, children, ...props }, ref) => (
+  <ScrollAreaPrimitive.Root
+    ref={ref}
+    className={cn("relative overflow-hidden", className)}
+    {...props}
+  >
+    <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit]">
+      {children}
+    </ScrollAreaPrimitive.Viewport>
+    <ScrollBar />
+    <ScrollAreaPrimitive.Corner />
+  </ScrollAreaPrimitive.Root>
+))
+ScrollArea.displayName = ScrollAreaPrimitive.Root.displayName
+
+const ScrollBar = React.forwardRef<
+  React.ElementRef<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>,
+  React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>
+>(({ className, orientation = "vertical", ...props }, ref) => (
+  <ScrollAreaPrimitive.ScrollAreaScrollbar
+    ref={ref}
+    orientation={orientation}
+    className={cn(
+      "flex touch-none select-none transition-colors",
+      orientation === "vertical" &&
+        "h-full w-2.5 border-l border-l-transparent p-[1px]",
+      orientation === "horizontal" &&
+        "h-2.5 flex-col border-t border-t-transparent p-[1px]",
+      className
+    )}
+    {...props}
+  >
+    <ScrollAreaPrimitive.ScrollAreaThumb className="relative flex-1 rounded-full bg-border" />
+  </ScrollAreaPrimitive.ScrollAreaScrollbar>
+))
+ScrollBar.displayName = ScrollAreaPrimitive.ScrollAreaScrollbar.displayName
+
+export { ScrollArea, ScrollBar }
+
+================
+File: src/components/ui/table.tsx
+================
+import * as React from "react"
+
+import { cn } from "~/lib/utils"
+
+const Table = React.forwardRef<
+  HTMLTableElement,
+  React.HTMLAttributes<HTMLTableElement>
+>(({ className, ...props }, ref) => (
+  <div className="relative w-full overflow-auto">
+    <table
+      ref={ref}
+      className={cn("w-full caption-bottom text-sm", className)}
+      {...props}
+    />
+  </div>
+))
+Table.displayName = "Table"
+
+const TableHeader = React.forwardRef<
+  HTMLTableSectionElement,
+  React.HTMLAttributes<HTMLTableSectionElement>
+>(({ className, ...props }, ref) => (
+  <thead ref={ref} className={cn("[&_tr]:border-b", className)} {...props} />
+))
+TableHeader.displayName = "TableHeader"
+
+const TableBody = React.forwardRef<
+  HTMLTableSectionElement,
+  React.HTMLAttributes<HTMLTableSectionElement>
+>(({ className, ...props }, ref) => (
+  <tbody
+    ref={ref}
+    className={cn("[&_tr:last-child]:border-0", className)}
+    {...props}
+  />
+))
+TableBody.displayName = "TableBody"
+
+const TableFooter = React.forwardRef<
+  HTMLTableSectionElement,
+  React.HTMLAttributes<HTMLTableSectionElement>
+>(({ className, ...props }, ref) => (
+  <tfoot
+    ref={ref}
+    className={cn(
+      "border-t bg-muted/50 font-medium [&>tr]:last:border-b-0",
+      className
+    )}
+    {...props}
+  />
+))
+TableFooter.displayName = "TableFooter"
+
+const TableRow = React.forwardRef<
+  HTMLTableRowElement,
+  React.HTMLAttributes<HTMLTableRowElement>
+>(({ className, ...props }, ref) => (
+  <tr
+    ref={ref}
+    className={cn(
+      "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
+      className
+    )}
+    {...props}
+  />
+))
+TableRow.displayName = "TableRow"
+
+const TableHead = React.forwardRef<
+  HTMLTableCellElement,
+  React.ThHTMLAttributes<HTMLTableCellElement>
+>(({ className, ...props }, ref) => (
+  <th
+    ref={ref}
+    className={cn(
+      "h-10 px-2 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+      className
+    )}
+    {...props}
+  />
+))
+TableHead.displayName = "TableHead"
+
+const TableCell = React.forwardRef<
+  HTMLTableCellElement,
+  React.TdHTMLAttributes<HTMLTableCellElement>
+>(({ className, ...props }, ref) => (
+  <td
+    ref={ref}
+    className={cn(
+      "p-2 align-middle [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+      className
+    )}
+    {...props}
+  />
+))
+TableCell.displayName = "TableCell"
+
+const TableCaption = React.forwardRef<
+  HTMLTableCaptionElement,
+  React.HTMLAttributes<HTMLTableCaptionElement>
+>(({ className, ...props }, ref) => (
+  <caption
+    ref={ref}
+    className={cn("mt-4 text-sm text-muted-foreground", className)}
+    {...props}
+  />
+))
+TableCaption.displayName = "TableCaption"
+
+export {
+  Table,
+  TableHeader,
+  TableBody,
+  TableFooter,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableCaption,
+}
+
+================
+File: src/lib/utils.ts
+================
+import { clsx, type ClassValue } from "clsx"
+import { twMerge } from "tailwind-merge"
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+
+================
+File: src/server/api/routers/post.ts
+================
+import { z } from "zod";
+
+import {
+  createTRPCRouter,
+  protectedProcedure,
+  publicProcedure,
+} from "~/server/api/trpc";
+
+export const postRouter = createTRPCRouter({
+  hello: publicProcedure
+    .input(z.object({ text: z.string() }))
+    .query(({ input }) => {
+      return {
+        greeting: `Hello ${input.text}`,
+      };
+    }),
+
+  create: protectedProcedure
+    .input(z.object({ name: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.db.post.create({
+        data: {
+          name: input.name,
+          createdBy: { connect: { id: ctx.session.user.id } },
+        },
+      });
+    }),
+
+  getLatest: protectedProcedure.query(async ({ ctx }) => {
+    const post = await ctx.db.post.findFirst({
+      orderBy: { createdAt: "desc" },
+      where: { createdBy: { id: ctx.session.user.id } },
+    });
+
+    return post ?? null;
+  }),
+
+  getSecretMessage: protectedProcedure.query(() => {
+    return "you can now see this secret message!";
+  }),
+});
+
+================
+File: src/server/api/root.ts
+================
+import { postRouter } from "~/server/api/routers/post";
+import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
+
+/**
+ * This is the primary router for your server.
+ *
+ * All routers added in /api/routers should be manually added here.
+ */
+export const appRouter = createTRPCRouter({
+  post: postRouter,
+});
+
+// export type definition of API
+export type AppRouter = typeof appRouter;
+
+/**
+ * Create a server-side caller for the tRPC API.
+ * @example
+ * const trpc = createCaller(createContext);
+ * const res = await trpc.post.all();
+ *       ^? Post[]
+ */
+export const createCaller = createCallerFactory(appRouter);
+
+================
+File: src/server/api/trpc.ts
+================
+/**
+ * YOU PROBABLY DON'T NEED TO EDIT THIS FILE, UNLESS:
+ * 1. You want to modify request context (see Part 1).
+ * 2. You want to create a new middleware or type of procedure (see Part 3).
+ *
+ * TL;DR - This is where all the tRPC server stuff is created and plugged in. The pieces you will
+ * need to use are documented accordingly near the end.
+ */
+
+import { initTRPC, TRPCError } from "@trpc/server";
+import superjson from "superjson";
+import { ZodError } from "zod";
+
+import { auth } from "~/server/auth";
+import { db } from "~/server/db";
+
+/**
+ * 1. CONTEXT
+ *
+ * This section defines the "contexts" that are available in the backend API.
+ *
+ * These allow you to access things when processing a request, like the database, the session, etc.
+ *
+ * This helper generates the "internals" for a tRPC context. The API handler and RSC clients each
+ * wrap this and provides the required context.
+ *
+ * @see https://trpc.io/docs/server/context
+ */
+export const createTRPCContext = async (opts: { headers: Headers }) => {
+  const session = await auth();
+
+  return {
+    db,
+    session,
+    ...opts,
+  };
+};
+
+/**
+ * 2. INITIALIZATION
+ *
+ * This is where the tRPC API is initialized, connecting the context and transformer. We also parse
+ * ZodErrors so that you get typesafety on the frontend if your procedure fails due to validation
+ * errors on the backend.
+ */
+const t = initTRPC.context<typeof createTRPCContext>().create({
+  transformer: superjson,
+  errorFormatter({ shape, error }) {
+    return {
+      ...shape,
+      data: {
+        ...shape.data,
+        zodError:
+          error.cause instanceof ZodError ? error.cause.flatten() : null,
+      },
+    };
+  },
+});
+
+/**
+ * Create a server-side caller.
+ *
+ * @see https://trpc.io/docs/server/server-side-calls
+ */
+export const createCallerFactory = t.createCallerFactory;
+
+/**
+ * 3. ROUTER & PROCEDURE (THE IMPORTANT BIT)
+ *
+ * These are the pieces you use to build your tRPC API. You should import these a lot in the
+ * "/src/server/api/routers" directory.
+ */
+
+/**
+ * This is how you create new routers and sub-routers in your tRPC API.
+ *
+ * @see https://trpc.io/docs/router
+ */
+export const createTRPCRouter = t.router;
+
+/**
+ * Middleware for timing procedure execution and adding an artificial delay in development.
+ *
+ * You can remove this if you don't like it, but it can help catch unwanted waterfalls by simulating
+ * network latency that would occur in production but not in local development.
+ */
+const timingMiddleware = t.middleware(async ({ next, path }) => {
+  const start = Date.now();
+
+  if (t._config.isDev) {
+    // artificial delay in dev
+    const waitMs = Math.floor(Math.random() * 400) + 100;
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
+  }
+
+  const result = await next();
+
+  const end = Date.now();
+  console.log(`[TRPC] ${path} took ${end - start}ms to execute`);
+
+  return result;
+});
+
+/**
+ * Public (unauthenticated) procedure
+ *
+ * This is the base piece you use to build new queries and mutations on your tRPC API. It does not
+ * guarantee that a user querying is authorized, but you can still access user session data if they
+ * are logged in.
+ */
+export const publicProcedure = t.procedure.use(timingMiddleware);
+
+/**
+ * Protected (authenticated) procedure
+ *
+ * If you want a query or mutation to ONLY be accessible to logged in users, use this. It verifies
+ * the session is valid and guarantees `ctx.session.user` is not null.
+ *
+ * @see https://trpc.io/docs/procedures
+ */
+export const protectedProcedure = t.procedure
+  .use(timingMiddleware)
+  .use(({ ctx, next }) => {
+    if (!ctx.session || !ctx.session.user) {
+      throw new TRPCError({ code: "UNAUTHORIZED" });
+    }
+    return next({
+      ctx: {
+        // infers the `session` as non-nullable
+        session: { ...ctx.session, user: ctx.session.user },
+      },
+    });
+  });
+
+================
+File: src/server/auth/config.ts
+================
+import { PrismaAdapter } from "@auth/prisma-adapter";
+import { type DefaultSession, type NextAuthConfig } from "next-auth";
+import DiscordProvider from "next-auth/providers/discord";
+
+import { db } from "~/server/db";
+
+/**
+ * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
+ * object and keep type safety.
+ *
+ * @see https://next-auth.js.org/getting-started/typescript#module-augmentation
+ */
+declare module "next-auth" {
+  interface Session extends DefaultSession {
+    user: {
+      id: string;
+      // ...other properties
+      // role: UserRole;
+    } & DefaultSession["user"];
+  }
+
+  // interface User {
+  //   // ...other properties
+  //   // role: UserRole;
+  // }
+}
+
+/**
+ * Options for NextAuth.js used to configure adapters, providers, callbacks, etc.
+ *
+ * @see https://next-auth.js.org/configuration/options
+ */
+export const authConfig = {
+  providers: [
+    DiscordProvider,
+    /**
+     * ...add more providers here.
+     *
+     * Most other providers require a bit more work than the Discord provider. For example, the
+     * GitHub provider requires you to add the `refresh_token_expires_in` field to the Account
+     * model. Refer to the NextAuth.js docs for the provider you want to use. Example:
+     *
+     * @see https://next-auth.js.org/providers/github
+     */
+  ],
+  adapter: PrismaAdapter(db),
+  callbacks: {
+    session: ({ session, user }) => ({
+      ...session,
+      user: {
+        ...session.user,
+        id: user.id,
+      },
+    }),
+  },
+} satisfies NextAuthConfig;
+
+================
+File: src/server/auth/index.ts
+================
+import NextAuth from "next-auth";
+import { cache } from "react";
+
+import { authConfig } from "./config";
+
+const { auth: uncachedAuth, handlers, signIn, signOut } = NextAuth(authConfig);
+
+const auth = cache(uncachedAuth);
+
+export { auth, handlers, signIn, signOut };
+
+================
+File: src/server/db.ts
+================
+import { PrismaClient } from "@prisma/client";
+
+import { env } from "~/env";
+
+const createPrismaClient = () =>
+  new PrismaClient({
+    log:
+      env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
+  });
+
+const globalForPrisma = globalThis as unknown as {
+  prisma: ReturnType<typeof createPrismaClient> | undefined;
+};
+
+export const db = globalForPrisma.prisma ?? createPrismaClient();
+
+if (env.NODE_ENV !== "production") globalForPrisma.prisma = db;
+
+================
+File: src/styles/globals.css
+================
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 3.9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 3.9%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem
+  }
+  .dark {
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 14.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 0 0% 83.1%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%
+  }
+}
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+================
+File: src/trpc/query-client.ts
+================
+import {
+  defaultShouldDehydrateQuery,
+  QueryClient,
+} from "@tanstack/react-query";
+import SuperJSON from "superjson";
+
+export const createQueryClient = () =>
+  new QueryClient({
+    defaultOptions: {
+      queries: {
+        // With SSR, we usually want to set some default staleTime
+        // above 0 to avoid refetching immediately on the client
+        staleTime: 30 * 1000,
+      },
+      dehydrate: {
+        serializeData: SuperJSON.serialize,
+        shouldDehydrateQuery: (query) =>
+          defaultShouldDehydrateQuery(query) ||
+          query.state.status === "pending",
+      },
+      hydrate: {
+        deserializeData: SuperJSON.deserialize,
+      },
+    },
+  });
+
+================
+File: src/trpc/react.tsx
+================
+"use client";
+
+import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
+import { loggerLink, unstable_httpBatchStreamLink } from "@trpc/client";
+import { createTRPCReact } from "@trpc/react-query";
+import { type inferRouterInputs, type inferRouterOutputs } from "@trpc/server";
+import { useState } from "react";
+import SuperJSON from "superjson";
+
+import { type AppRouter } from "~/server/api/root";
+import { createQueryClient } from "./query-client";
+
+let clientQueryClientSingleton: QueryClient | undefined = undefined;
+const getQueryClient = () => {
+  if (typeof window === "undefined") {
+    // Server: always make a new query client
+    return createQueryClient();
+  }
+  // Browser: use singleton pattern to keep the same query client
+  return (clientQueryClientSingleton ??= createQueryClient());
+};
+
+export const api = createTRPCReact<AppRouter>();
+
+/**
+ * Inference helper for inputs.
+ *
+ * @example type HelloInput = RouterInputs['example']['hello']
+ */
+export type RouterInputs = inferRouterInputs<AppRouter>;
+
+/**
+ * Inference helper for outputs.
+ *
+ * @example type HelloOutput = RouterOutputs['example']['hello']
+ */
+export type RouterOutputs = inferRouterOutputs<AppRouter>;
+
+export function TRPCReactProvider(props: { children: React.ReactNode }) {
+  const queryClient = getQueryClient();
+
+  const [trpcClient] = useState(() =>
+    api.createClient({
+      links: [
+        loggerLink({
+          enabled: (op) =>
+            process.env.NODE_ENV === "development" ||
+            (op.direction === "down" && op.result instanceof Error),
+        }),
+        unstable_httpBatchStreamLink({
+          transformer: SuperJSON,
+          url: getBaseUrl() + "/api/trpc",
+          headers: () => {
+            const headers = new Headers();
+            headers.set("x-trpc-source", "nextjs-react");
+            return headers;
+          },
+        }),
+      ],
+    })
+  );
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <api.Provider client={trpcClient} queryClient={queryClient}>
+        {props.children}
+      </api.Provider>
+    </QueryClientProvider>
+  );
+}
+
+function getBaseUrl() {
+  if (typeof window !== "undefined") return window.location.origin;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return `http://localhost:${process.env.PORT ?? 3000}`;
+}
+
+================
+File: src/trpc/server.ts
+================
+import "server-only";
+
+import { createHydrationHelpers } from "@trpc/react-query/rsc";
+import { headers } from "next/headers";
+import { cache } from "react";
+
+import { createCaller, type AppRouter } from "~/server/api/root";
+import { createTRPCContext } from "~/server/api/trpc";
+import { createQueryClient } from "./query-client";
+
+/**
+ * This wraps the `createTRPCContext` helper and provides the required context for the tRPC API when
+ * handling a tRPC call from a React Server Component.
+ */
+const createContext = cache(async () => {
+  const heads = new Headers(await headers());
+  heads.set("x-trpc-source", "rsc");
+
+  return createTRPCContext({
+    headers: heads,
+  });
+});
+
+const getQueryClient = cache(createQueryClient);
+const caller = createCaller(createContext);
+
+export const { trpc: api, HydrateClient } = createHydrationHelpers<AppRouter>(
+  caller,
+  getQueryClient
+);
+
+================
+File: src/env.js
+================
+import { createEnv } from "@t3-oss/env-nextjs";
+import { z } from "zod";
+
+export const env = createEnv({
+  /**
+   * Specify your server-side environment variables schema here. This way you can ensure the app
+   * isn't built with invalid env vars.
+   */
+  server: {
+    AUTH_SECRET:
+      process.env.NODE_ENV === "production"
+        ? z.string()
+        : z.string().optional(),
+    // AUTH_DISCORD_ID: z.string(),
+    // AUTH_DISCORD_SECRET: z.string(),
+    DATABASE_URL: z.string().url(),
+    NODE_ENV: z
+      .enum(["development", "test", "production"])
+      .default("development"),
+  },
+
+  /**
+   * Specify your client-side environment variables schema here. This way you can ensure the app
+   * isn't built with invalid env vars. To expose them to the client, prefix them with
+   * `NEXT_PUBLIC_`.
+   */
+  client: {
+    // NEXT_PUBLIC_CLIENTVAR: z.string(),
+  },
+
+  /**
+   * You can't destruct `process.env` as a regular object in the Next.js edge runtimes (e.g.
+   * middlewares) or client-side so we need to destruct manually.
+   */
+  runtimeEnv: {
+    AUTH_SECRET: process.env.AUTH_SECRET,
+    // AUTH_DISCORD_ID: process.env.AUTH_DISCORD_ID,
+    // AUTH_DISCORD_SECRET: process.env.AUTH_DISCORD_SECRET,
+    DATABASE_URL: process.env.DATABASE_URL,
+    NODE_ENV: process.env.NODE_ENV,
+  },
+  /**
+   * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially
+   * useful for Docker builds.
+   */
+  skipValidation: !!process.env.SKIP_ENV_VALIDATION,
+  /**
+   * Makes it so that empty strings are treated as undefined. `SOME_VAR: z.string()` and
+   * `SOME_VAR=''` will throw an error.
+   */
+  emptyStringAsUndefined: true,
+});
+
+================
+File: .env-e
+================
+# When adding additional environment variables, the schema in "/src/env.js"
+# should be updated accordingly.
+
+# Next Auth
+# You can generate a new secret on the command line with:
+# npx auth secret
+# https://next-auth.js.org/configuration/options#secret
+AUTH_SECRET="k4hbrMJ/J/k+kzXRHElthyYFIlQWzxuprTuM/j1x6fI=" # Generated by create-t3-app.
+
+# Next Auth Discord Provider
+AUTH_DISCORD_ID=""
+AUTH_DISCORD_SECRET=""
+
+# Prisma
+# https://www.prisma.io/docs/reference/database-reference/connection-urls#env
+DATABASE_URL="postgresql://postgres:password@localhost:5432/map8"
+
+================
+File: .env.example
+================
+# Since the ".env" file is gitignored, you can use the ".env.example" file to
+# build a new ".env" file when you clone the repo. Keep this file up-to-date
+# when you add new variables to `.env`.
+
+# This file will be committed to version control, so make sure not to have any
+# secrets in it. If you are cloning this repo, create a copy of this file named
+# ".env" and populate it with your secrets.
+
+# When adding additional environment variables, the schema in "/src/env.js"
+# should be updated accordingly.
+
+# Next Auth
+# You can generate a new secret on the command line with:
+# npx auth secret
+# https://next-auth.js.org/configuration/options#secret
+AUTH_SECRET=""
+
+# Next Auth Discord Provider
+AUTH_DISCORD_ID=""
+AUTH_DISCORD_SECRET=""
+
+# Prisma
+# https://www.prisma.io/docs/reference/database-reference/connection-urls#env
+DATABASE_URL="postgresql://postgres:password@localhost:5432/map8"
+
+================
+File: .eslintrc.cjs
+================
+/** @type {import("eslint").Linter.Config} */
+const config = {
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "project": true
+  },
+  "plugins": [
+    "@typescript-eslint"
+  ],
+  "extends": [
+    "next/core-web-vitals",
+    "plugin:@typescript-eslint/recommended-type-checked",
+    "plugin:@typescript-eslint/stylistic-type-checked"
+  ],
+  "rules": {
+    "@typescript-eslint/array-type": "off",
+    "@typescript-eslint/consistent-type-definitions": "off",
+    "@typescript-eslint/consistent-type-imports": [
+      "warn",
+      {
+        "prefer": "type-imports",
+        "fixStyle": "inline-type-imports"
+      }
+    ],
+    "@typescript-eslint/no-unused-vars": [
+      "warn",
+      {
+        "argsIgnorePattern": "^_"
+      }
+    ],
+    "@typescript-eslint/require-await": "off",
+    "@typescript-eslint/no-misused-promises": [
+      "error",
+      {
+        "checksVoidReturn": {
+          "attributes": false
+        }
+      }
+    ]
+  }
+}
+module.exports = config;
+
+================
+File: .gitignore
+================
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# database
+/prisma/db.sqlite
+/prisma/db.sqlite-journal
+db.sqlite
+
+# next.js
+/.next/
+/out/
+next-env.d.ts
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# local env files
+# do not commit any .env files to git, except for the .env.example file. https://create.t3.gg/en/usage/env-variables#using-environment-variables
+.env
+.env*.local
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+
+# idea files
+.idea
+
+================
+File: components.json
+================
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": true,
+  "tsx": true,
+  "tailwind": {
+    "config": "tailwind.config.ts",
+    "css": "src/styles/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "aliases": {
+    "components": "~/components",
+    "utils": "~/lib/utils",
+    "ui": "~/components/ui",
+    "lib": "~/lib",
+    "hooks": "~/hooks"
+  },
+  "iconLibrary": "lucide"
+}
+
+================
+File: next.config.js
+================
+/**
+ * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially useful
+ * for Docker builds.
+ */
+import "./src/env.js";
+
+/** @type {import("next").NextConfig} */
+const config = {};
+
+export default config;
+
+================
+File: package.json
+================
+{
+  "name": "map8",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "next build",
+    "check": "next lint && tsc --noEmit",
+    "db:generate": "prisma migrate dev",
+    "db:migrate": "prisma migrate deploy",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio",
+    "dev": "next dev --turbo",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,mdx}\" --cache",
+    "format:write": "prettier --write \"**/*.{ts,tsx,js,jsx,mdx}\" --cache",
+    "postinstall": "prisma generate",
+    "lint": "next lint",
+    "lint:fix": "next lint --fix",
+    "preview": "next build && next start",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@auth/prisma-adapter": "^2.7.2",
+    "@prisma/client": "^5.14.0",
+    "@radix-ui/react-scroll-area": "^1.2.3",
+    "@t3-oss/env-nextjs": "^0.10.1",
+    "@tanstack/react-query": "^5.50.0",
+    "@trpc/client": "^11.0.0-rc.446",
+    "@trpc/react-query": "^11.0.0-rc.446",
+    "@trpc/server": "^11.0.0-rc.446",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "geist": "^1.3.0",
+    "lucide-react": "^0.475.0",
+    "next": "^15.0.1",
+    "next-auth": "5.0.0-beta.25",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "server-only": "^0.0.1",
+    "superjson": "^2.2.1",
+    "tailwind-merge": "^3.0.1",
+    "tailwindcss-animate": "^1.0.7",
+    "zod": "^3.23.3"
+  },
+  "devDependencies": {
+    "@types/eslint": "^8.56.10",
+    "@types/node": "^20.14.10",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@typescript-eslint/eslint-plugin": "^8.1.0",
+    "@typescript-eslint/parser": "^8.1.0",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "^15.0.1",
+    "postcss": "^8.4.39",
+    "prettier": "^3.3.2",
+    "prettier-plugin-tailwindcss": "^0.6.5",
+    "prisma": "^5.14.0",
+    "tailwindcss": "^3.4.3",
+    "typescript": "^5.5.3"
+  },
+  "ct3aMetadata": {
+    "initVersion": "7.38.1"
+  },
+  "packageManager": "pnpm@8.6.9"
+}
+
+================
+File: postcss.config.js
+================
+export default {
+  plugins: {
+    tailwindcss: {},
+  },
+};
+
+================
+File: prettier.config.js
+================
+/** @type {import('prettier').Config & import('prettier-plugin-tailwindcss').PluginOptions} */
+export default {
+  plugins: ["prettier-plugin-tailwindcss"],
+};
+
+================
+File: prompt_plan.md
+================
+# **REVISED PROJECT BLUEPRINT - FRONTEND FIRST APPROACH**
+
+## **Phase 1: Project Setup & Storybook**
+
+1. **Initialize Project**
+   - Create Next.js + TypeScript project
+   - Configure ESLint, Prettier, Jest
+   - Set up basic CI/CD
+   - Deploy "Hello World" to Vercel
+
+2. **Storybook Setup**
+   - Install and configure Storybook
+   - Set up design tokens (colors, typography, spacing)
+   - Create documentation template
+   - Add testing addons for accessibility and interactions
+
+3. **Core Components**
+   - Build and document atomic components:
+     - Buttons (Primary, Secondary, Connect Wallet)
+     - Input fields
+     - Cards (Property, User)
+     - Navigation elements
+     - Modal windows
+   - Write component tests
+   - Create Storybook stories for each
+
+## **Phase 2: Page Layout & Routes**
+
+1. **Route Structure**
+   - Set up Next.js pages:
+     - Home/Landing
+     - Property Listings
+     - Property Detail
+     - User Dashboard
+     - Seller Dashboard
+     - Authentication pages
+
+2. **Layout Components**
+   - Header with navigation
+   - Footer
+   - Sidebar (where needed)
+   - Responsive layouts
+   - Document in Storybook
+
+3. **Navigation Flow**
+   - Implement client-side routing
+   - Loading states
+   - Error boundaries
+   - 404 page
+
+## **Phase 3: Feature Components with Mock Data**
+
+1. **Property Listing Components**
+   - Property grid/list view
+   - Search filters
+   - Map view placeholder
+   - Sort/filter UI
+   - Mock data structure
+
+2. **Property Detail Components**
+   - Image gallery
+   - 3D viewer placeholder
+   - Property details section
+   - "Buy Now" flow UI
+   - Contact forms
+
+3. **User Features**
+   - Authentication UI flows
+   - Profile settings
+   - Favorites system
+   - Notifications panel
+
+4. **Seller Features**
+   - Property creation form
+   - Dashboard stats (with mock data)
+   - Listing management UI
+   - Boost listing interface
+
+## **Phase 4: Interactive Features (Still with Mock Data)**
+
+1. **3D Viewer Integration**
+   - Implement Three.js viewer
+   - Controls for exterior/interior
+   - Loading states
+   - Fallback views
+
+2. **Map Implementation**
+   - Integrate Deck.gl + Google Maps
+   - Property markers
+   - Search by location
+   - Interactive filters
+
+3. **Wallet Connection UI**
+   - Phantom wallet connect flow
+   - Transaction simulation
+   - Error states
+   - Success/failure modals
+
+## **Phase 5: State Management & Data Flow**
+
+1. **Frontend State**
+   - Set up state management (Redux/Zustand)
+   - Define data models
+   - Create actions/reducers
+   - Implement local storage
+
+2. **Mock API Layer**
+   - Create API interfaces
+   - Mock response data
+   - Error handling
+   - Loading states
+
+## **Phase 6: Backend Integration**
+
+1. **Database & tRPC**
+   - Set up PostgreSQL
+   - Configure tRPC
+   - Replace mock data gradually
+   - Update tests
+
+2. **Authentication**
+   - Implement real wallet connection
+   - Add Google/Apple auth
+   - Session management
+   - Update relevant components
+
+3. **Property Management**
+   - Real database operations
+   - Image/file uploads
+   - Search/filter implementation
+   - Update Storybook examples
+
+## **Phase 7: Blockchain Integration**
+
+1. **Smart Contracts**
+   - Implement Solana contracts
+   - Connect to frontend
+   - Test transactions
+   - Update UI states
+
+2. **NFT Features**
+   - Implement minting
+   - IPFS storage
+   - Update property status
+   - Transaction history
+
+## **Phase 8: Final Features**
+
+1. **Notifications**
+   - Real-time updates
+   - Email integration
+   - Push notifications
+   - Update UI components
+
+2. **Social Features**
+   - Share functionality
+   - Social previews
+   - 3D snapshots
+
+## **Phase 9: Testing & Documentation**
+
+1. **Testing**
+   - E2E tests
+   - Integration tests
+   - Performance testing
+   - Security audit
+
+2. **Documentation**
+   - Update Storybook
+   - API documentation
+   - Deployment guides
+   - User documentation
+
+## **Phase 10: Production Release**
+
+1. **Optimization**
+   - Performance optimization
+   - Bundle size reduction
+   - Image optimization
+   - Loading strategies
+
+2. **Deployment**
+   - Staging deployment
+   - Production checklist
+   - Monitoring setup
+   - Launch
+
+---
+
+# **PROMPTS FOR IMPLEMENTATION**
+
+Here's a sample of how the prompts would change to reflect this frontend-first approach:
+
+### **Prompt 1: Project Setup**
+```text
+Let's set up a Next.js project with TypeScript, including:
+1. ESLint and Prettier configuration
+2. Jest and React Testing Library
+3. Basic GitHub Actions
+4. Storybook installation and configuration
+5. Initial design tokens (colors, typography)
+
+Please provide the complete setup code and configuration files.
+```
+
+### **Prompt 2: Core Components**
+```text
+We need to create and document our core components:
+1. Create a Button component with variants
+2. Set up its Storybook story
+3. Write component tests
+4. Add accessibility checks
+5. Document props and usage
+
+Please provide the component code, story, and tests.
+```
+
+[Continue with similar prompts for each phase...]
+
+The key differences in this approach are:
+1. Frontend components are built and documented first
+2. All features start with mock data
+3. Storybook documentation is a first-class citizen
+4. Backend integration happens only after UI is solid
+5. Each component is fully documented before moving on
+
+This approach allows for:
+- Faster visual feedback
+- Better component documentation
+- Easier UI testing and iteration
+- Clear separation of concerns
+- More maintainable codebase
+
+================
+File: README.md
+================
+# Create T3 App
+
+This is a [T3 Stack](https://create.t3.gg/) project bootstrapped with `create-t3-app`.
+
+## What's next? How do I make an app with this?
+
+We try to keep this project as simple as possible, so you can start with just the scaffolding we set up for you, and add additional things later when they become necessary.
+
+If you are not familiar with the different technologies used in this project, please refer to the respective docs. If you still are in the wind, please join our [Discord](https://t3.gg/discord) and ask for help.
+
+- [Next.js](https://nextjs.org)
+- [NextAuth.js](https://next-auth.js.org)
+- [Prisma](https://prisma.io)
+- [Drizzle](https://orm.drizzle.team)
+- [Tailwind CSS](https://tailwindcss.com)
+- [tRPC](https://trpc.io)
+
+## Learn More
+
+To learn more about the [T3 Stack](https://create.t3.gg/), take a look at the following resources:
+
+- [Documentation](https://create.t3.gg/)
+- [Learn the T3 Stack](https://create.t3.gg/en/faq#what-learning-resources-are-currently-available) — Check out these awesome tutorials
+
+You can check out the [create-t3-app GitHub repository](https://github.com/t3-oss/create-t3-app) — your feedback and contributions are welcome!
+
+## How do I deploy this?
+
+Follow our deployment guides for [Vercel](https://create.t3.gg/en/deployment/vercel), [Netlify](https://create.t3.gg/en/deployment/netlify) and [Docker](https://create.t3.gg/en/deployment/docker) for more information.
+
+================
+File: spec.md
+================
+**Niseko Real Estate Platform - Developer Specification**
+
+## **1. Overview**
+
+A web-based platform that allows international buyers to browse, inquire, and purchase homes in Niseko, Japan, with **Solana (SOL) or USDC** via **Phantom Wallet**. The app integrates **3D property renderings**, **legal verification automation**, and **NFT-based property ownership proof**. Sellers can list properties, manage inquiries, and track listing performance.
+
+---
+
+## **2. Core Features & Requirements**
+
+### **2.1. User Authentication & Access**
+
+- **Login Methods:**
+  - Phantom Wallet (default for buyers)
+  - Google/Apple login (alternative for non-crypto users)
+  - Guest mode (browse homes & favorite listings without login)
+- **Security:**
+  - Wallet login is deemed sufficient; no multi-factor authentication (MFA)
+  - Automatic logout for inactive wallet connections
+- **Multi-device support:** Wallet users sync across devices
+
+### **2.2. Property Browsing & Search**
+
+- **3D Interactive Property Models:**
+  - Rendered using **Three.js**
+  - Toggle between exterior & interior views
+  - Clickable annotations for property features (e.g., "Heated floors")
+  - Snapshot & social sharing (Twitter/iMessage/Instagram Stories)
+- **Map & List View:**
+  - **Deck.gl + Google Maps 3D** integration
+  - Toggle between **map mode & list/grid format**
+  - Map layers: **Ski lifts, terrain elevation, restaurants & amenities, snowfall conditions**
+- **Filters & Search:**
+  - Price range, number of bedrooms/bathrooms, property size
+  - Search by location (e.g., "Upper Hirafu")
+- **Favorite Listings:**
+  - Saved locally for guest users, synced for logged-in users
+  - "Recently Viewed" & "Trending Properties" sections
+
+### **2.3. Purchasing Process**
+
+- **Instant "Buy Now" Transaction:**
+  - **Crypto Payment Options:** SOL auto-converts to USDC
+  - **Escrow Smart Contract:** Funds held until legal approval
+  - **Live Price Conversion:** USD/SOL/USDC exchange rate displayed before checkout
+- **Legal Verification:**
+  - **Automated API review** with fallback to a human lawyer
+  - Legal documents generated via Dropbox Sign API
+  - KYC required before transaction finalization
+  - NFT-based property deed stored on IPFS
+- **No Refund Policy:** Once the smart contract executes, all sales are final
+
+### **2.4. Ownership & Documentation**
+
+- **Secure Document Storage:**
+  - Legal documents stored in **AWS S3/Firebase** for easy access
+  - NFT metadata (including property details & ownership proof) stored on **IPFS**
+- **User Access to Legal Docs:**
+  - Download all documents as a zip file
+  - Legal verification status updates with push notifications
+
+### **2.5. Seller Features**
+
+- **Seller Dashboard:**
+  - Listing performance metrics (views, favorites, inquiries, video calls)
+  - "Boost Listing" (paid feature) to promote homes in "Trending Properties"
+  - "Recommended Price" feature based on market insights
+  - Option to **pause listings** (e.g., "Not accepting inquiries now")
+- **Buyer Communication:**
+  - Email inquiries & **video calls via the app**
+  - AI auto-replies for common questions
+  - Sellers can block unwanted buyers
+
+### **2.6. Notifications & Alerts**
+
+- **Push Notifications for:**
+  - Transaction updates (e.g., "Purchase under review")
+  - Seller inquiries & video call requests
+  - Weekly/monthly market trend reports
+- **Email Notifications:**
+  - Property listing performance reports
+  - Legal document availability & ownership confirmation
+- **Users can customize notification settings**
+
+### **2.7. Social Sharing & Marketing**
+
+- **Snapshot & Share:**
+  - Users can take & share **multi-angle 3D property snapshots**
+  - Auto-generated captions for **Twitter, Instagram Stories, iMessage**
+  - "Copy Link" button for manual sharing
+
+---
+
+## **3. Technical Architecture**
+
+### **3.1. Tech Stack**
+
+- **Frontend:** Next.js (React, TypeScript), Three.js, Deck.gl
+- **Backend:** **tRPC (TypeScript-based API framework), Node.js**
+- **Deployment:** **Vercel for frontend & backend hosting**
+- **Database:** PostgreSQL (property listings, user data), Redis (caching)
+- **Web3 Integration:** Solana, Phantom Wallet, NFT smart contracts (Rust)
+- **Storage:** AWS S3/Firebase (legal docs), IPFS (NFT metadata)
+- **APIs:** Google Maps, Dropbox Sign, Solana price conversion
+
+### **3.2. Smart Contract Design**
+
+- **Escrow Mechanism:**
+  - Buyer funds held in escrow (USDC) until legal verification completes
+  - Smart contract releases funds & transfers NFT upon approval
+- **NFT Metadata Structure:**
+  ```json
+  {
+    "name": "Niseko Ski Home #123",
+    "description": "Luxury ski-in/ski-out home in Upper Hirafu.",
+    "image": "ipfs://...",
+    "attributes": {
+      "location": "Niseko, Japan",
+      "property_size": "250 sqm",
+      "bedrooms": 4,
+      "bathrooms": 3,
+      "ownership_status": "Owned by Wallet Address",
+      "legal_documents": "ipfs://..."
+    }
+  }
+  ```
+
+---
+
+## **4. Error Handling & Security**
+
+- **KYC Verification Failures:** Display rejection reason, allow resubmission
+- **Transaction Errors:** Show fallback error messages (e.g., "Payment failed, try again")
+- **Rate Limiting:** Prevent spam listings & automated bot activity
+- **Secure API Communication:** Use OAuth & Web3 authentication
+- **Auto-Logout:** Disconnect Phantom Wallet after inactivity
+
+---
+
+## **5. Testing Plan**
+
+### **5.1. Unit Testing**
+
+- Web3 smart contract functionality (Solana transactions, escrow logic)
+- Legal API automation workflows (edge cases for verification failures)
+- 3D rendering performance (lazy-loading, annotation interactions)
+
+### **5.2. Integration Testing**
+
+- **Frontend-Backend Communication:** Next.js API calls to tRPC backend
+- **Crypto Payments:** End-to-end Solana transactions with escrow contract
+- **Legal Verification:** Automated API handling & Dropbox Sign document signing
+
+### **5.3. Performance Testing**
+
+- Map rendering optimizations (Deck.gl & Google Maps layers)
+- 3D model async loading under various network conditions
+
+### **5.4. Security Testing**
+
+- Web3 wallet security (ensure only owner can view NFT ownership details)
+- SQL injection prevention for buyer/seller input fields
+- Rate-limiting & bot prevention on property listings
+
+---
+
+## **6. Deployment Strategy**
+
+- **Hosting:** Full-stack deployment on **Vercel**
+- **Staging Environment:** Firebase & Solana testnet before live deployment
+- **CI/CD Pipeline:** GitHub Actions for automated testing & deployment
+- **Monitoring:** Cloudflare for DDoS protection, LogRocket for user session monitoring
+
+---
+
+This document serves as a **developer-ready specification** for building the Niseko real estate platform. 🚀
+
+================
+File: start-database.sh
+================
+#!/usr/bin/env bash
+# Use this script to start a docker container for a local development database
+
+# TO RUN ON WINDOWS:
+# 1. Install WSL (Windows Subsystem for Linux) - https://learn.microsoft.com/en-us/windows/wsl/install
+# 2. Install Docker Desktop for Windows - https://docs.docker.com/docker-for-windows/install/
+# 3. Open WSL - `wsl`
+# 4. Run this script - `./start-database.sh`
+
+# On Linux and macOS you can run this script directly - `./start-database.sh`
+
+DB_CONTAINER_NAME="map8-postgres"
+
+if ! [ -x "$(command -v docker)" ]; then
+  echo -e "Docker is not installed. Please install docker and try again.\nDocker install guide: https://docs.docker.com/engine/install/"
+  exit 1
+fi
+
+if ! docker info > /dev/null 2>&1; then
+  echo "Docker daemon is not running. Please start Docker and try again."
+  exit 1
+fi
+
+if [ "$(docker ps -q -f name=$DB_CONTAINER_NAME)" ]; then
+  echo "Database container '$DB_CONTAINER_NAME' already running"
+  exit 0
+fi
+
+if [ "$(docker ps -q -a -f name=$DB_CONTAINER_NAME)" ]; then
+  docker start "$DB_CONTAINER_NAME"
+  echo "Existing database container '$DB_CONTAINER_NAME' started"
+  exit 0
+fi
+
+# import env variables from .env
+set -a
+source .env
+
+DB_PASSWORD=$(echo "$DATABASE_URL" | awk -F':' '{print $3}' | awk -F'@' '{print $1}')
+DB_PORT=$(echo "$DATABASE_URL" | awk -F':' '{print $4}' | awk -F'\/' '{print $1}')
+
+if [ "$DB_PASSWORD" = "password" ]; then
+  echo "You are using the default database password"
+  read -p "Should we generate a random password for you? [y/N]: " -r REPLY
+  if ! [[ $REPLY =~ ^[Yy]$ ]]; then
+    echo "Please change the default password in the .env file and try again"
+    exit 1
+  fi
+  # Generate a random URL-safe password
+  DB_PASSWORD=$(openssl rand -base64 12 | tr '+/' '-_')
+  sed -i -e "s#:password@#:$DB_PASSWORD@#" .env
+fi
+
+docker run -d \
+  --name $DB_CONTAINER_NAME \
+  -e POSTGRES_USER="postgres" \
+  -e POSTGRES_PASSWORD="$DB_PASSWORD" \
+  -e POSTGRES_DB=map8 \
+  -p "$DB_PORT":5432 \
+  docker.io/postgres && echo "Database container '$DB_CONTAINER_NAME' was successfully created"
+
+================
+File: tailwind.config.ts
+================
+import { type Config } from "tailwindcss";
+import { fontFamily } from "tailwindcss/defaultTheme";
+
+export default {
+    darkMode: ["class"],
+    content: ["./src/**/*.tsx"],
+  theme: {
+  	extend: {
+  		fontFamily: {
+  			sans: [
+  				'var(--font-geist-sans)',
+                    ...fontFamily.sans
+                ]
+  		},
+  		borderRadius: {
+  			lg: 'var(--radius)',
+  			md: 'calc(var(--radius) - 2px)',
+  			sm: 'calc(var(--radius) - 4px)'
+  		},
+  		colors: {
+  			background: 'hsl(var(--background))',
+  			foreground: 'hsl(var(--foreground))',
+  			card: {
+  				DEFAULT: 'hsl(var(--card))',
+  				foreground: 'hsl(var(--card-foreground))'
+  			},
+  			popover: {
+  				DEFAULT: 'hsl(var(--popover))',
+  				foreground: 'hsl(var(--popover-foreground))'
+  			},
+  			primary: {
+  				DEFAULT: 'hsl(var(--primary))',
+  				foreground: 'hsl(var(--primary-foreground))'
+  			},
+  			secondary: {
+  				DEFAULT: 'hsl(var(--secondary))',
+  				foreground: 'hsl(var(--secondary-foreground))'
+  			},
+  			muted: {
+  				DEFAULT: 'hsl(var(--muted))',
+  				foreground: 'hsl(var(--muted-foreground))'
+  			},
+  			accent: {
+  				DEFAULT: 'hsl(var(--accent))',
+  				foreground: 'hsl(var(--accent-foreground))'
+  			},
+  			destructive: {
+  				DEFAULT: 'hsl(var(--destructive))',
+  				foreground: 'hsl(var(--destructive-foreground))'
+  			},
+  			border: 'hsl(var(--border))',
+  			input: 'hsl(var(--input))',
+  			ring: 'hsl(var(--ring))',
+  			chart: {
+  				'1': 'hsl(var(--chart-1))',
+  				'2': 'hsl(var(--chart-2))',
+  				'3': 'hsl(var(--chart-3))',
+  				'4': 'hsl(var(--chart-4))',
+  				'5': 'hsl(var(--chart-5))'
+  			}
+  		}
+  	}
+  },
+  plugins: [require("tailwindcss-animate")],
+} satisfies Config;
+
+================
+File: todo.md
+================
+# TODO Checklist
+
+This file provides a comprehensive checklist for building the **Niseko Real Estate Platform** as specified.  
+Each **Phase** is broken down into tasks and subtasks. Check them off as you progress.
+
+---
+
+## Phase 1: Core Project Setup
+
+- [ ] **Initialize GitHub Repo**
+  - [ ] Create a new repo (e.g., `niseko-real-estate`)
+  - [ ] Add a `README.md`
+  - [ ] Configure branch protection rules (optional but recommended)
+- [ ] **Initialize Next.js + TypeScript**
+  - [ ] `npx create-next-app@latest --typescript` (or a preferred template)
+  - [ ] Confirm basic folder structure is generated
+- [ ] **Add ESLint & Prettier**
+  - [ ] Install & configure ESLint (extends `eslint:recommended`, `plugin:@typescript-eslint/recommended`)
+  - [ ] Install & configure Prettier
+  - [ ] Ensure ESLint and Prettier work together without conflict
+- [ ] **Set Up Testing (Jest + React Testing Library)**
+  - [ ] Install `jest`, `@testing-library/react`, and types
+  - [ ] Add a basic test (e.g., `Home.test.tsx`) to confirm setup
+- [ ] **Configure GitHub Actions / CI**
+  - [ ] Add a `.github/workflows/ci.yml` file for lint + test on push/PR
+  - [ ] Confirm CI runs successfully
+- [ ] **Deploy "Hello World" to Vercel**
+  - [ ] Connect repo to Vercel
+  - [ ] Validate the site is live
+
+---
+
+## Phase 2: Database & Basic APIs
+
+- [ ] **Set Up PostgreSQL**
+  - [ ] Decide on local Docker vs. hosted DB
+  - [ ] Create a database (e.g., `niseko_db`)
+- [ ] **Initialize ORM (e.g., Prisma)**
+  - [ ] `npx prisma init`
+  - [ ] Configure `DATABASE_URL` in `.env`
+- [ ] **Create Basic Models**
+  - [ ] `User` (id, email, role, createdAt)
+  - [ ] Migrate DB schema (`npx prisma migrate dev`)
+- [ ] **Configure tRPC**
+  - [ ] Set up minimal tRPC "hello" endpoint in `/api/trpc/[trpc].ts`
+  - [ ] Write a unit test to call the endpoint
+- [ ] **Add `getUsers` Endpoint**
+  - [ ] Implement resolver that returns a list of `User`
+  - [ ] Write a unit test ensuring it returns users from DB
+
+---
+
+## Phase 3: Authentication
+
+# Authentication Implementation
+
+## Setup ✅
+- [x] Set up Prisma User model with wallet and auth fields
+- [x] Configure NextAuth with Google provider
+- [x] Set up protected and public tRPC procedures
+- [x] Create login page with Google sign-in
+- [x] Add error handling for auth failures
+
+## Phantom Wallet Integration 🚧
+- [x] Create PhantomButton component
+- [x] Add wallet connection logic
+- [ ] Test wallet connection flow
+- [ ] Add wallet disconnect functionality
+- [ ] Add wallet connection status indicator
+
+## Google OAuth ✅
+- [x] Configure Google OAuth credentials
+- [x] Implement Google sign-in
+- [x] Store Google users in database
+- [x] Handle OAuth callbacks and errors
+
+## Testing 🚧
+- [x] Basic auth router tests
+- [ ] Complete Phantom wallet tests
+- [ ] Test protected route access
+- [ ] Test session persistence
+- [ ] Test user creation flow
+
+## Additional Tasks
+- [x] Add middleware for protected routes
+- [x] Set up error pages
+- [ ] Add loading states
+- [ ] Add proper error handling for wallet connections
+- [ ] Add user profile page
+
+---
+
+## Phase 4: Property Listings & 3D Models
+
+- [ ] **Property Listing Form (Minimal)**
+  - [ ] Create a `Property` model (id, title, description, price, imageURLs, createdAt, etc.)
+  - [ ] `createProperty` tRPC endpoint (seller must be authenticated)
+  - [ ] Unit tests for property creation
+- [ ] **Display Properties**
+  - [ ] Implement a listing page (grid/list of properties)
+  - [ ] Simple filter by price or location on front-end
+  - [ ] Integration test to ensure listings are fetched/displayed
+- [ ] **3D Model Integration**
+  - [ ] Update `Property` model to include a `modelURL` or similar
+  - [ ] Set up Three.js in the property detail page
+  - [ ] Implement toggle between exterior/interior views (two .glb files or a single model with toggles)
+  - [ ] Write tests (mock 3D if needed) to confirm the viewer renders
+
+---
+
+## Phase 5: Map & Search
+
+- [ ] **Deck.gl + Google Maps Integration**
+  - [ ] Add lat/long fields to `Property` model
+  - [ ] Configure Google Maps API & Deck.gl layers
+  - [ ] Render property markers on the map
+- [ ] **Search & Filters**
+  - [ ] Implement text-based search (e.g., location name)
+  - [ ] Add filter controls (price range, bedrooms, etc.)
+  - [ ] tRPC endpoint to query filtered results
+  - [ ] Integration tests for searching/filtering
+- [ ] **Map Performance**
+  - [ ] Test with multiple markers (bulk data)
+  - [ ] Confirm no major slowdowns or errors
+
+---
+
+## Phase 6: Purchase Flow & Escrow (Solana)
+
+- [ ] **Solana Smart Contract Scaffold**
+  - [ ] Create a minimal Rust contract for escrow on local test validator
+  - [ ] Write Rust tests verifying deposit/lock logic
+- [ ] **Frontend "Buy Now"**
+  - [ ] Connect "Buy Now" button to tRPC which calls the Solana contract
+  - [ ] Check user's SOL/USDC balance
+  - [ ] Handle success/failure states
+- [ ] **Escrow State**
+  - [ ] Mark property as `IN_ESCROW` in DB
+  - [ ] Write integration tests for deposit & escrow status
+- [ ] **Error Handling**
+  - [ ] Provide user-friendly fallback (transaction fail, insufficient funds)
+  - [ ] Tests to ensure errors are handled gracefully
+
+---
+
+## Phase 7: Legal Verification & NFT Mint
+
+- [ ] **Dropbox Sign / E-Sign Integration**
+  - [ ] Connect or mock an e-sign API
+  - [ ] Generate doc placeholders (user details, property info)
+  - [ ] KYC check (mock or real external API)
+- [ ] **Legal Workflow**
+  - [ ] Upon user's e-sign & successful KYC, finalize escrow
+  - [ ] Update property to `SOLD` or `OWNED` status
+- [ ] **NFT Minting**
+  - [ ] Once verified, mint an NFT on Solana (store property data in metadata)
+  - [ ] Upload metadata (incl. legal docs link) to IPFS
+  - [ ] Write tests covering deposit → e-sign → minted NFT
+- [ ] **Error Handling**
+  - [ ] Handle KYC failures or doc signing errors
+  - [ ] Display reason & allow retry
+
+---
+
+## Phase 8: Seller Dashboard & Boosting
+
+- [ ] **Seller Dashboard**
+  - [ ] Show each property's stats: views, favorites, inquiries
+  - [ ] TRPC endpoint to fetch stats for the seller's properties only
+  - [ ] Write tests for data visibility (owner vs. non-owner)
+- [ ] **Boost Listing**
+  - [ ] Add a `boosted` field in the `Property` model
+  - [ ] UI control to toggle "Boost" (or a separate paid action)
+  - [ ] Show boosted listings in "Trending Properties" or top of search results
+- [ ] **Integration Tests**
+  - [ ] Seller flow: create → view stats → boost
+  - [ ] Confirm stats increment with page views & favorites
+
+---
+
+## Phase 9: Notifications & Social Sharing
+
+- [ ] **Push Notifications / Email**
+  - [ ] Integrate a notification service (e.g., Firebase Cloud Messaging or email fallback)
+  - [ ] Send notifications on:
+    - [ ] Transaction updates
+    - [ ] Seller inquiries
+    - [ ] Legal doc completion
+  - [ ] Write tests (mock or real service) for sending notifications
+- [ ] **3D Snapshot & Share**
+  - [ ] Implement a button to capture the current 3D viewport
+  - [ ] Generate a shareable link (property detail page)
+  - [ ] (Optional) Integrate direct sharing to Twitter/Instagram
+- [ ] **Tests**
+  - [ ] Confirm notifications are triggered at correct events
+  - [ ] Validate snapshot and share logic in multiple browsers (where possible)
+
+---
+
+## Phase 10: Final Integration & Security
+
+- [ ] **Rate Limiting & Captchas**
+  - [ ] Add rate-limits on critical routes (login, property creation)
+  - [ ] (Optional) Integrate captcha for additional spam protection
+- [ ] **Performance Tests**
+  - [ ] Check 3D model load times in different network conditions
+  - [ ] Stress test map rendering with many markers
+- [ ] **Staging Deployment**
+  - [ ] Deploy to a test environment (Vercel staging + Solana testnet)
+  - [ ] Conduct final E2E tests (escrow, NFT mint, notifications)
+- [ ] **Production Release**
+  - [ ] Set up mainnet configuration for Solana
+  - [ ] Update environment variables securely
+  - [ ] Final QA & security review
+- [ ] **Documentation & Cleanup**
+  - [ ] Ensure `README.md` is up to date (setup instructions, usage)
+  - [ ] Remove any placeholder code or mock data
+  - [ ] Verify no orphaned or unused code remains
+
+---
+
+**Use this checklist to ensure each feature is developed, tested, and integrated fully before moving on.**
+Happy building!
+
+================
+File: tsconfig.json
+================
+{
+  "compilerOptions": {
+    /* Base Options: */
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "target": "es2022",
+    "allowJs": true,
+    "resolveJsonModule": true,
+    "moduleDetection": "force",
+    "isolatedModules": true,
+
+    /* Strictness */
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "checkJs": true,
+
+    /* Bundled projects */
+    "lib": ["dom", "dom.iterable", "ES2022"],
+    "noEmit": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "preserve",
+    "plugins": [{ "name": "next" }],
+    "incremental": true,
+
+    /* Path Aliases */
+    "baseUrl": ".",
+    "paths": {
+      "~/*": ["./src/*"]
+    }
+  },
+  "include": [
+    ".eslintrc.cjs",
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.cjs",
+    "**/*.js",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": ["node_modules"]
+}
+
+
+
+================================================================
+End of Codebase
+================================================================
