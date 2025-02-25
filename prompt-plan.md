@@ -3,6 +3,7 @@
 ## **Phase 1: Project Setup & Infrastructure**
 
 ### **1. Initialize the Next.js Project**
+
 ```text
 You are a React and Next.js expert. Set up a new Next.js project with TypeScript.
 
@@ -20,6 +21,7 @@ Test Cases:
 ```
 
 ### **2. Configure Jotai for Global State Management**
+
 ```text
 You are an expert in state management. Implement Jotai for managing global state in a Next.js project.
 
@@ -38,8 +40,10 @@ Test Cases:
 ## **Phase 2: Core Chat System**
 
 ### **3. Implement Chat Input & Keyboard Shortcuts**
+
 ```text
 You are an expert in UI and keyboard interactions. Create a chat input component with keyboard shortcuts.
+
 
 Requirements:
 - Implement an input box for user prompts.
@@ -53,6 +57,7 @@ Test Cases:
 ```
 
 ### **4. Set Up Multi-Column Layout for LLM Responses**
+
 ```text
 You are an expert in responsive UI design. Implement a multi-column layout using Tailwind CSS.
 
@@ -70,6 +75,7 @@ Test Cases:
 ## **Phase 3: API Integration & Response Handling**
 
 ### **5. Implement API Request Handling**
+
 ```text
 You are an expert in API integrations. Implement API request handling for multiple LLMs.
 
@@ -85,6 +91,7 @@ Test Cases:
 ```
 
 ### **6. Implement Streaming Response Handling**
+
 ```text
 You are an expert in real-time UX. Implement streaming response handling for LLMs.
 
@@ -102,6 +109,7 @@ Test Cases:
 ## **Phase 4: UX Enhancements & Performance Optimizations**
 
 ### **7. Implement Error Handling & Status Indicators**
+
 ```text
 You are an expert in error handling. Implement UI indicators for API failures and system status.
 
@@ -117,6 +125,7 @@ Test Cases:
 ```
 
 ### **8. Implement Auto-Collapse for Long Responses**
+
 ```text
 You are an expert in UI behavior. Implement auto-collapsing for long responses.
 
@@ -134,6 +143,7 @@ Test Cases:
 ## **Final Phase: Deployment & Maintenance**
 
 ### **9. Implement Authentication & API Key Management**
+
 ```text
 You are an expert in authentication. Implement Clerky for user sign-in and API key management.
 
@@ -149,6 +159,7 @@ Test Cases:
 ```
 
 ### **10. Final Testing & Deployment**
+
 ```text
 You are an expert in testing and deployment. Ensure the app is production-ready.
 
@@ -166,4 +177,3 @@ Test Cases:
 ---
 
 This structured set of **test-driven development prompts** ensures **incremental progress, best practices, and robust testing at every stage**. Each prompt builds upon the previous, **avoiding orphaned or unused code**. 🚀 Let me know if you'd like any refinements!
-
