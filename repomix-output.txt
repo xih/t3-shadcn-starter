@@ -45,6 +45,13 @@ Additional Info:
 ================================================================
 Directory Structure
 ================================================================
+.github/
+  workflows/
+    test.yml
+.storybook/
+  main.ts
+  middleware.ts
+  preview.ts
 prisma/
   schema.prisma
 src/
@@ -62,6 +69,10 @@ src/
     page.tsx
   components/
     ui/
+      button/
+        button.stories.tsx
+        button.test.tsx
+        button.tsx
       card.tsx
       scroll-area.tsx
       table.tsx
@@ -77,6 +88,23 @@ src/
       config.ts
       index.ts
     db.ts
+  stories/
+    assets/
+      accessibility.svg
+      discord.svg
+      github.svg
+      tutorials.svg
+      youtube.svg
+    button.css
+    Button.stories.ts
+    Button.tsx
+    Configure.mdx
+    header.css
+    Header.stories.ts
+    Header.tsx
+    page.css
+    Page.stories.ts
+    Page.tsx
   styles/
     globals.css
   trpc/
@@ -87,13 +115,19 @@ src/
 .env-e
 .env.example
 .eslintrc.cjs
+.eslintrc.json
 .gitignore
+.prettierignore
+.prettierrc
 components.json
+jest.config.ts
+jest.setup.ts
+lint-staged.config.js
 next.config.js
 package.json
 postcss.config.js
 prettier.config.js
-prompt_plan.md
+prompt-plan.md
 README.md
 spec.md
 start-database.sh
@@ -104,6 +138,111 @@ tsconfig.json
 ================================================================
 Files
 ================================================================
+
+================
+File: .github/workflows/test.yml
+================
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+
+      - uses: pnpm/action-setup@v2.2.4
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Run type check
+        run: pnpm typecheck
+
+      - name: Run lint
+        run: pnpm lint
+
+================
+File: .storybook/main.ts
+================
+import type { StorybookConfig } from "@storybook/nextjs";
+
+const config: StorybookConfig = {
+  stories: ["../src/**/*.mdx", "../src/**/*.stories.@(js|jsx|mjs|ts|tsx)"],
+  addons: [
+    "@storybook/addon-onboarding",
+    "@storybook/addon-essentials",
+    "@storybook/addon-interactions",
+  ],
+  framework: {
+    name: "@storybook/nextjs",
+    options: {
+      builder: {
+        useSWC: true,
+      },
+    },
+  },
+  staticDirs: ["../public"],
+  docs: {
+    autodocs: true,
+  },
+};
+
+export default config;
+
+================
+File: .storybook/middleware.ts
+================
+import type { StorybookConfig } from "@storybook/nextjs";
+
+export const middleware: StorybookConfig["viteFinal"] = async (config) => {
+  return {
+    ...config,
+    define: {
+      ...config.define,
+      "process.env": {},
+    },
+  };
+};
+
+================
+File: .storybook/preview.ts
+================
+import type { Preview } from "@storybook/react";
+import "../src/styles/globals.css";
+
+const preview: Preview = {
+  parameters: {
+    actions: { argTypesRegex: "^on[A-Z].*" },
+    controls: {
+      matchers: {
+        color: /(background|color)$/i,
+        date: /Date$/i,
+      },
+    },
+    nextjs: {
+      appDirectory: true,
+    },
+  },
+};
+
+export default preview;
 
 ================
 File: prisma/schema.prisma
@@ -382,6 +521,188 @@ export default async function Home() {
     </HydrateClient>
   );
 }
+
+================
+File: src/components/ui/button/button.stories.tsx
+================
+import type { Meta, StoryObj } from "@storybook/react";
+import { Button } from "./button";
+
+const meta = {
+  title: "UI/Button",
+  component: Button,
+  parameters: {
+    layout: "centered",
+  },
+  tags: ["autodocs"],
+} satisfies Meta<typeof Button>;
+
+export default meta;
+type Story = StoryObj<typeof Button>;
+
+export const Default: Story = {
+  args: {
+    children: "Button",
+    variant: "default",
+  },
+};
+
+export const Secondary: Story = {
+  args: {
+    children: "Secondary",
+    variant: "secondary",
+  },
+};
+
+export const Destructive: Story = {
+  args: {
+    children: "Destructive",
+    variant: "destructive",
+  },
+};
+
+export const Outline: Story = {
+  args: {
+    children: "Outline",
+    variant: "outline",
+  },
+};
+
+export const Ghost: Story = {
+  args: {
+    children: "Ghost",
+    variant: "ghost",
+  },
+};
+
+export const Link: Story = {
+  args: {
+    children: "Link",
+    variant: "link",
+  },
+};
+
+export const Small: Story = {
+  args: {
+    children: "Small",
+    size: "sm",
+  },
+};
+
+export const Large: Story = {
+  args: {
+    children: "Large",
+    size: "lg",
+  },
+};
+
+export const Icon: Story = {
+  args: {
+    children: "🔥",
+    size: "icon",
+  },
+};
+
+================
+File: src/components/ui/button/button.test.tsx
+================
+import { render, screen } from "@testing-library/react";
+import { Button } from "./button";
+
+describe("Button", () => {
+  it("renders with default props", () => {
+    render(<Button>Click me</Button>);
+    
+    const button = screen.getByRole("button", { name: /click me/i });
+    expect(button).toBeInTheDocument();
+    expect(button).toHaveClass("bg-primary");
+  });
+
+  it("applies variant classes correctly", () => {
+    render(<Button variant="destructive">Delete</Button>);
+    
+    const button = screen.getByRole("button", { name: /delete/i });
+    expect(button).toHaveClass("bg-destructive");
+  });
+
+  it("applies size classes correctly", () => {
+    render(<Button size="lg">Large Button</Button>);
+    
+    const button = screen.getByRole("button", { name: /large button/i });
+    expect(button).toHaveClass("h-11");
+  });
+
+  it("renders as child when asChild is true", () => {
+    render(
+      <Button asChild>
+        <a href="#">Link Button</a>
+      </Button>
+    );
+    
+    const link = screen.getByRole("link", { name: /link button/i });
+    expect(link).toHaveClass("bg-primary");
+  });
+});
+
+================
+File: src/components/ui/button/button.tsx
+================
+import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
+import { cva, type VariantProps } from "class-variance-authority";
+
+import { cn } from "~/lib/utils";
+
+const buttonVariants = cva(
+  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+  {
+    variants: {
+      variant: {
+        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        destructive:
+          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        outline:
+          "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+        secondary:
+          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        ghost: "hover:bg-accent hover:text-accent-foreground",
+        link: "text-primary underline-offset-4 hover:underline",
+      },
+      size: {
+        default: "h-10 px-4 py-2",
+        sm: "h-9 rounded-md px-3",
+        lg: "h-11 rounded-md px-8",
+        icon: "h-10 w-10",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+      size: "default",
+    },
+  },
+);
+
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {
+  asChild?: boolean;
+}
+
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant, size, asChild = false, ...props }, ref) => {
+    const Comp = asChild ? Slot : "button";
+    return (
+      <Comp
+        className={cn(buttonVariants({ variant, size, className }))}
+        ref={ref}
+        {...props}
+      />
+    );
+  },
+);
+Button.displayName = "Button";
+
+export { Button, buttonVariants };
 
 ================
 File: src/components/ui/card.tsx
@@ -954,6 +1275,936 @@ export const db = globalForPrisma.prisma ?? createPrismaClient();
 if (env.NODE_ENV !== "production") globalForPrisma.prisma = db;
 
 ================
+File: src/stories/assets/accessibility.svg
+================
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="none" viewBox="0 0 48 48"><title>Accessibility</title><circle cx="24.334" cy="24" r="24" fill="#A849FF" fill-opacity=".3"/><path fill="#A470D5" fill-rule="evenodd" d="M27.8609 11.585C27.8609 9.59506 26.2497 7.99023 24.2519 7.99023C22.254 7.99023 20.6429 9.65925 20.6429 11.585C20.6429 13.575 22.254 15.1799 24.2519 15.1799C26.2497 15.1799 27.8609 13.575 27.8609 11.585ZM21.8922 22.6473C21.8467 23.9096 21.7901 25.4788 21.5897 26.2771C20.9853 29.0462 17.7348 36.3314 17.3325 37.2275C17.1891 37.4923 17.1077 37.7955 17.1077 38.1178C17.1077 39.1519 17.946 39.9902 18.9802 39.9902C19.6587 39.9902 20.253 39.6293 20.5814 39.0889L20.6429 38.9874L24.2841 31.22C24.2841 31.22 27.5529 37.9214 27.9238 38.6591C28.2948 39.3967 28.8709 39.9902 29.7168 39.9902C30.751 39.9902 31.5893 39.1519 31.5893 38.1178C31.5893 37.7951 31.3639 37.2265 31.3639 37.2265C30.9581 36.3258 27.698 29.0452 27.0938 26.2771C26.8975 25.4948 26.847 23.9722 26.8056 22.7236C26.7927 22.333 26.7806 21.9693 26.7653 21.6634C26.7008 21.214 27.0231 20.8289 27.4097 20.7005L35.3366 18.3253C36.3033 18.0685 36.8834 16.9773 36.6256 16.0144C36.3678 15.0515 35.2722 14.4737 34.3055 14.7305C34.3055 14.7305 26.8619 17.1057 24.2841 17.1057C21.7062 17.1057 14.456 14.7947 14.456 14.7947C13.4893 14.5379 12.3937 14.9873 12.0715 15.9502C11.7493 16.9131 12.3293 18.0044 13.3604 18.3253L21.2873 20.7005C21.674 20.8289 21.9318 21.214 21.9318 21.6634C21.9174 21.9493 21.9053 22.2857 21.8922 22.6473Z" clip-rule="evenodd"/></svg>
+
+================
+File: src/stories/assets/discord.svg
+================
+<svg xmlns="http://www.w3.org/2000/svg" width="33" height="32" fill="none" viewBox="0 0 33 32"><g clip-path="url(#clip0_10031_177575)"><mask id="mask0_10031_177575" style="mask-type:luminance" width="33" height="25" x="0" y="4" maskUnits="userSpaceOnUse"><path fill="#fff" d="M32.5034 4.00195H0.503906V28.7758H32.5034V4.00195Z"/></mask><g mask="url(#mask0_10031_177575)"><path fill="#5865F2" d="M27.5928 6.20817C25.5533 5.27289 23.3662 4.58382 21.0794 4.18916C21.0378 4.18154 20.9962 4.20057 20.9747 4.23864C20.6935 4.73863 20.3819 5.3909 20.1637 5.90358C17.7042 5.53558 15.2573 5.53558 12.8481 5.90358C12.6299 5.37951 12.307 4.73863 12.0245 4.23864C12.003 4.20184 11.9614 4.18281 11.9198 4.18916C9.63431 4.58255 7.44721 5.27163 5.40641 6.20817C5.38874 6.21578 5.3736 6.22848 5.36355 6.24497C1.21508 12.439 0.078646 18.4809 0.636144 24.4478C0.638667 24.477 0.655064 24.5049 0.677768 24.5227C3.41481 26.5315 6.06609 27.7511 8.66815 28.5594C8.70979 28.5721 8.75392 28.5569 8.78042 28.5226C9.39594 27.6826 9.94461 26.7968 10.4151 25.8653C10.4428 25.8107 10.4163 25.746 10.3596 25.7244C9.48927 25.3945 8.66058 24.9922 7.86343 24.5354C7.80038 24.4986 7.79533 24.4084 7.85333 24.3653C8.02108 24.2397 8.18888 24.109 8.34906 23.977C8.37804 23.9529 8.41842 23.9478 8.45249 23.963C13.6894 26.3526 19.359 26.3526 24.5341 23.963C24.5682 23.9465 24.6086 23.9516 24.6388 23.9757C24.799 24.1077 24.9668 24.2397 25.1358 24.3653C25.1938 24.4084 25.19 24.4986 25.127 24.5354C24.3298 25.0011 23.5011 25.3945 22.6296 25.7232C22.5728 25.7447 22.5476 25.8107 22.5754 25.8653C23.0559 26.7955 23.6046 27.6812 24.2087 28.5213C24.234 28.5569 24.2794 28.5721 24.321 28.5594C26.9357 27.7511 29.5869 26.5315 32.324 24.5227C32.348 24.5049 32.3631 24.4783 32.3656 24.4491C33.0328 17.5506 31.2481 11.5584 27.6344 6.24623C27.6256 6.22848 27.6105 6.21578 27.5928 6.20817ZM11.1971 20.8146C9.62043 20.8146 8.32129 19.3679 8.32129 17.5913C8.32129 15.8146 9.59523 14.368 11.1971 14.368C12.8115 14.368 14.0981 15.8273 14.0729 17.5913C14.0729 19.3679 12.7989 20.8146 11.1971 20.8146ZM21.8299 20.8146C20.2533 20.8146 18.9541 19.3679 18.9541 17.5913C18.9541 15.8146 20.228 14.368 21.8299 14.368C23.4444 14.368 24.7309 15.8273 24.7057 17.5913C24.7057 19.3679 23.4444 20.8146 21.8299 20.8146Z"/></g></g><defs><clipPath id="clip0_10031_177575"><rect width="32" height="32" fill="#fff" transform="translate(0.5)"/></clipPath></defs></svg>
+
+================
+File: src/stories/assets/github.svg
+================
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="none" viewBox="0 0 32 32"><path fill="#161614" d="M16.0001 0C7.16466 0 0 7.17472 0 16.0256C0 23.1061 4.58452 29.1131 10.9419 31.2322C11.7415 31.3805 12.0351 30.8845 12.0351 30.4613C12.0351 30.0791 12.0202 28.8167 12.0133 27.4776C7.56209 28.447 6.62283 25.5868 6.62283 25.5868C5.89499 23.7345 4.8463 23.2419 4.8463 23.2419C3.39461 22.2473 4.95573 22.2678 4.95573 22.2678C6.56242 22.3808 7.40842 23.9192 7.40842 23.9192C8.83547 26.3691 11.1514 25.6609 12.0645 25.2514C12.2081 24.2156 12.6227 23.5087 13.0803 23.1085C9.52648 22.7032 5.7906 21.3291 5.7906 15.1886C5.7906 13.4389 6.41563 12.0094 7.43916 10.8871C7.27303 10.4834 6.72537 8.85349 7.59415 6.64609C7.59415 6.64609 8.93774 6.21539 11.9953 8.28877C13.2716 7.9337 14.6404 7.75563 16.0001 7.74953C17.3599 7.75563 18.7297 7.9337 20.0084 8.28877C23.0623 6.21539 24.404 6.64609 24.404 6.64609C25.2749 8.85349 24.727 10.4834 24.5608 10.8871C25.5868 12.0094 26.2075 13.4389 26.2075 15.1886C26.2075 21.3437 22.4645 22.699 18.9017 23.0957C19.4756 23.593 19.9869 24.5683 19.9869 26.0634C19.9869 28.2077 19.9684 29.9334 19.9684 30.4613C19.9684 30.8877 20.2564 31.3874 21.0674 31.2301C27.4213 29.1086 32 23.1037 32 16.0256C32 7.17472 24.8364 0 16.0001 0ZM5.99257 22.8288C5.95733 22.9084 5.83227 22.9322 5.71834 22.8776C5.60229 22.8253 5.53711 22.7168 5.57474 22.6369C5.60918 22.5549 5.7345 22.5321 5.85029 22.587C5.9666 22.6393 6.03284 22.7489 5.99257 22.8288ZM6.7796 23.5321C6.70329 23.603 6.55412 23.5701 6.45291 23.4581C6.34825 23.3464 6.32864 23.197 6.40601 23.125C6.4847 23.0542 6.62937 23.0874 6.73429 23.1991C6.83895 23.3121 6.85935 23.4605 6.7796 23.5321ZM7.31953 24.4321C7.2215 24.5003 7.0612 24.4363 6.96211 24.2938C6.86407 24.1513 6.86407 23.9804 6.96422 23.9119C7.06358 23.8435 7.2215 23.905 7.32191 24.0465C7.41968 24.1914 7.41968 24.3623 7.31953 24.4321ZM8.23267 25.4743C8.14497 25.5712 7.95818 25.5452 7.82146 25.413C7.68156 25.2838 7.64261 25.1004 7.73058 25.0035C7.81934 24.9064 8.00719 24.9337 8.14497 25.0648C8.28381 25.1938 8.3262 25.3785 8.23267 25.4743ZM9.41281 25.8262C9.37413 25.9517 9.19423 26.0088 9.013 25.9554C8.83203 25.9005 8.7136 25.7535 8.75016 25.6266C8.78778 25.5003 8.96848 25.4408 9.15104 25.4979C9.33174 25.5526 9.45044 25.6985 9.41281 25.8262ZM10.7559 25.9754C10.7604 26.1076 10.6067 26.2172 10.4165 26.2196C10.2252 26.2238 10.0704 26.1169 10.0683 25.9868C10.0683 25.8534 10.2185 25.7448 10.4098 25.7416C10.6001 25.7379 10.7559 25.8441 10.7559 25.9754ZM12.0753 25.9248C12.0981 26.0537 11.9658 26.1862 11.7769 26.2215C11.5912 26.2554 11.4192 26.1758 11.3957 26.0479C11.3726 25.9157 11.5072 25.7833 11.6927 25.7491C11.8819 25.7162 12.0512 25.7937 12.0753 25.9248Z"/></svg>
+
+================
+File: src/stories/assets/tutorials.svg
+================
+<svg xmlns="http://www.w3.org/2000/svg" width="33" height="32" fill="none" viewBox="0 0 33 32"><g clip-path="url(#clip0_10031_177597)"><path fill="#B7F0EF" fill-rule="evenodd" d="M17 7.87059C17 6.48214 17.9812 5.28722 19.3431 5.01709L29.5249 2.99755C31.3238 2.64076 33 4.01717 33 5.85105V22.1344C33 23.5229 32.0188 24.7178 30.6569 24.9879L20.4751 27.0074C18.6762 27.3642 17 25.9878 17 24.1539L17 7.87059Z" clip-rule="evenodd" opacity=".7"/><path fill="#87E6E5" fill-rule="evenodd" d="M1 5.85245C1 4.01857 2.67623 2.64215 4.47507 2.99895L14.6569 5.01848C16.0188 5.28861 17 6.48354 17 7.87198V24.1553C17 25.9892 15.3238 27.3656 13.5249 27.0088L3.34311 24.9893C1.98119 24.7192 1 23.5242 1 22.1358V5.85245Z" clip-rule="evenodd"/><path fill="#61C1FD" fill-rule="evenodd" d="M15.543 5.71289C15.543 5.71289 16.8157 5.96289 17.4002 6.57653C17.9847 7.19016 18.4521 9.03107 18.4521 9.03107C18.4521 9.03107 18.4521 25.1106 18.4521 26.9629C18.4521 28.8152 19.3775 31.4174 19.3775 31.4174L17.4002 28.8947L16.2575 31.4174C16.2575 31.4174 15.543 29.0765 15.543 27.122C15.543 25.1674 15.543 5.71289 15.543 5.71289Z" clip-rule="evenodd"/></g><defs><clipPath id="clip0_10031_177597"><rect width="32" height="32" fill="#fff" transform="translate(0.5)"/></clipPath></defs></svg>
+
+================
+File: src/stories/assets/youtube.svg
+================
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="none" viewBox="0 0 32 32"><path fill="#ED1D24" d="M31.3313 8.44657C30.9633 7.08998 29.8791 6.02172 28.5022 5.65916C26.0067 5.00026 16 5.00026 16 5.00026C16 5.00026 5.99333 5.00026 3.4978 5.65916C2.12102 6.02172 1.03665 7.08998 0.668678 8.44657C0 10.9053 0 16.0353 0 16.0353C0 16.0353 0 21.1652 0.668678 23.6242C1.03665 24.9806 2.12102 26.0489 3.4978 26.4116C5.99333 27.0703 16 27.0703 16 27.0703C16 27.0703 26.0067 27.0703 28.5022 26.4116C29.8791 26.0489 30.9633 24.9806 31.3313 23.6242C32 21.1652 32 16.0353 32 16.0353C32 16.0353 32 10.9053 31.3313 8.44657Z"/><path fill="#fff" d="M12.7266 20.6934L21.0902 16.036L12.7266 11.3781V20.6934Z"/></svg>
+
+================
+File: src/stories/button.css
+================
+.storybook-button {
+  display: inline-block;
+  cursor: pointer;
+  border: 0;
+  border-radius: 3em;
+  font-weight: 700;
+  line-height: 1;
+  font-family: 'Nunito Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+.storybook-button--primary {
+  background-color: #555ab9;
+  color: white;
+}
+.storybook-button--secondary {
+  box-shadow: rgba(0, 0, 0, 0.15) 0px 0px 0px 1px inset;
+  background-color: transparent;
+  color: #333;
+}
+.storybook-button--small {
+  padding: 10px 16px;
+  font-size: 12px;
+}
+.storybook-button--medium {
+  padding: 11px 20px;
+  font-size: 14px;
+}
+.storybook-button--large {
+  padding: 12px 24px;
+  font-size: 16px;
+}
+
+================
+File: src/stories/Button.stories.ts
+================
+import type { Meta, StoryObj } from '@storybook/react';
+
+import { Button } from './Button';
+
+// More on how to set up stories at: https://storybook.js.org/docs/writing-stories#default-export
+const meta = {
+  title: 'Example/Button',
+  component: Button,
+  parameters: {
+    // Optional parameter to center the component in the Canvas. More info: https://storybook.js.org/docs/configure/story-layout
+    layout: 'centered',
+  },
+  // This component will have an automatically generated Autodocs entry: https://storybook.js.org/docs/writing-docs/autodocs
+  tags: ['autodocs'],
+  // More on argTypes: https://storybook.js.org/docs/api/argtypes
+  argTypes: {
+    backgroundColor: { control: 'color' },
+  },
+} satisfies Meta<typeof Button>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+// More on writing stories with args: https://storybook.js.org/docs/writing-stories/args
+export const Primary: Story = {
+  args: {
+    primary: true,
+    label: 'Button',
+  },
+};
+
+export const Secondary: Story = {
+  args: {
+    label: 'Button',
+  },
+};
+
+export const Large: Story = {
+  args: {
+    size: 'large',
+    label: 'Button',
+  },
+};
+
+export const Small: Story = {
+  args: {
+    size: 'small',
+    label: 'Button',
+  },
+};
+
+================
+File: src/stories/Button.tsx
+================
+import React from 'react';
+import './button.css';
+
+interface ButtonProps {
+  /**
+   * Is this the principal call to action on the page?
+   */
+  primary?: boolean;
+  /**
+   * What background color to use
+   */
+  backgroundColor?: string;
+  /**
+   * How large should the button be?
+   */
+  size?: 'small' | 'medium' | 'large';
+  /**
+   * Button contents
+   */
+  label: string;
+  /**
+   * Optional click handler
+   */
+  onClick?: () => void;
+}
+
+/**
+ * Primary UI component for user interaction
+ */
+export const Button = ({
+  primary = false,
+  size = 'medium',
+  backgroundColor,
+  label,
+  ...props
+}: ButtonProps) => {
+  const mode = primary ? 'storybook-button--primary' : 'storybook-button--secondary';
+  return (
+    <button
+      type="button"
+      className={['storybook-button', `storybook-button--${size}`, mode].join(' ')}
+      {...props}
+    >
+      {label}
+      <style jsx>{`
+        button {
+          background-color: ${backgroundColor};
+        }
+      `}</style>
+    </button>
+  );
+};
+
+================
+File: src/stories/Configure.mdx
+================
+import { Meta } from "@storybook/blocks";
+import Image from "next/image";
+
+import Github from "./assets/github.svg";
+import Discord from "./assets/discord.svg";
+import Youtube from "./assets/youtube.svg";
+import Tutorials from "./assets/tutorials.svg";
+import Styling from "./assets/styling.png";
+import Context from "./assets/context.png";
+import Assets from "./assets/assets.png";
+import Docs from "./assets/docs.png";
+import Share from "./assets/share.png";
+import FigmaPlugin from "./assets/figma-plugin.png";
+import Testing from "./assets/testing.png";
+import Accessibility from "./assets/accessibility.png";
+import Theming from "./assets/theming.png";
+import AddonLibrary from "./assets/addon-library.png";
+
+export const RightArrow = () => <svg 
+    viewBox="0 0 14 14" 
+    width="8px" 
+    height="14px" 
+    style={{ 
+      marginLeft: '4px',
+      display: 'inline-block',
+      shapeRendering: 'inherit',
+      verticalAlign: 'middle',
+      fill: 'currentColor',
+      'path fill': 'currentColor'
+    }}
+>
+  <path d="m11.1 7.35-5.5 5.5a.5.5 0 0 1-.7-.7L10.04 7 4.9 1.85a.5.5 0 1 1 .7-.7l5.5 5.5c.2.2.2.5 0 .7Z" />
+</svg>
+
+<Meta title="Configure your project" />
+
+<div className="sb-container">
+  <div className='sb-section-title'>
+    # Configure your project
+
+    Because Storybook works separately from your app, you'll need to configure it for your specific stack and setup. Below, explore guides for configuring Storybook with popular frameworks and tools. If you get stuck, learn how you can ask for help from our community.
+  </div>
+  <div className="sb-section">
+    <div className="sb-section-item">
+      <Image
+        src={Styling}
+        alt="A wall of logos representing different styling technologies"
+        width={0}
+        height={0}
+        style={{ width: '100%', height: 'auto' }}
+      />
+      <h4 className="sb-section-item-heading">Add styling and CSS</h4>
+      <p className="sb-section-item-paragraph">Like with web applications, there are many ways to include CSS within Storybook. Learn more about setting up styling within Storybook.</p>
+      <a
+        href="https://storybook.js.org/docs/configure/styling-and-css"
+        target="_blank"
+      >Learn more<RightArrow /></a>
+    </div>
+    <div className="sb-section-item">
+      <Image 
+        width={0}
+        height={0}
+        style={{ width: '100%', height: 'auto' }}
+        src={Context}
+        alt="An abstraction representing the composition of data for a component"
+      />
+      <h4 className="sb-section-item-heading">Provide context and mocking</h4>
+      <p className="sb-section-item-paragraph">Often when a story doesn't render, it's because your component is expecting a specific environment or context (like a theme provider) to be available.</p>
+      <a
+        href="https://storybook.js.org/docs/writing-stories/decorators#context-for-mocking"
+        target="_blank"
+      >Learn more<RightArrow /></a>
+    </div>
+    <div className="sb-section-item">
+      <Image 
+        width={0}
+        height={0}
+        style={{ width: '100%', height: 'auto' }} 
+        src={Assets} 
+        alt="A representation of typography and image assets" 
+      />
+      <div>
+        <h4 className="sb-section-item-heading">Load assets and resources</h4>
+        <p className="sb-section-item-paragraph">To link static files (like fonts) to your projects and stories, use the
+        `staticDirs` configuration option to specify folders to load when
+        starting Storybook.</p>
+        <a
+          href="https://storybook.js.org/docs/configure/images-and-assets"
+          target="_blank"
+        >Learn more<RightArrow /></a>
+      </div>
+    </div>
+  </div>
+</div>
+<div className="sb-container">
+  <div className='sb-section-title'>
+    # Do more with Storybook
+
+    Now that you know the basics, let's explore other parts of Storybook that will improve your experience. This list is just to get you started. You can customise Storybook in many ways to fit your needs.
+  </div>
+
+  <div className="sb-section">
+    <div className="sb-features-grid">
+      <div className="sb-grid-item">
+        <Image 
+          width={0}
+          height={0}
+          style={{ width: '100%', height: 'auto' }} 
+          src={Docs} 
+          alt="A screenshot showing the autodocs tag being set, pointing a docs page being generated" 
+        />
+        <h4 className="sb-section-item-heading">Autodocs</h4>
+        <p className="sb-section-item-paragraph">Auto-generate living,
+          interactive reference documentation from your components and stories.</p>
+        <a
+          href="https://storybook.js.org/docs/writing-docs/autodocs"
+          target="_blank"
+        >Learn more<RightArrow /></a>
+      </div>
+      <div className="sb-grid-item">
+        <Image 
+          width={0}
+          height={0}
+          style={{ width: '100%', height: 'auto' }} 
+          src={Share} 
+          alt="A browser window showing a Storybook being published to a chromatic.com URL" 
+        />
+        <h4 className="sb-section-item-heading">Publish to Chromatic</h4>
+        <p className="sb-section-item-paragraph">Publish your Storybook to review and collaborate with your entire team.</p>
+        <a
+          href="https://storybook.js.org/docs/sharing/publish-storybook#publish-storybook-with-chromatic"
+          target="_blank"
+        >Learn more<RightArrow /></a>
+      </div>
+      <div className="sb-grid-item">
+        <Image 
+          width={0}
+          height={0}
+          style={{ width: '100%', height: 'auto' }} 
+          src={FigmaPlugin} 
+          alt="Windows showing the Storybook plugin in Figma" 
+        />
+        <h4 className="sb-section-item-heading">Figma Plugin</h4>
+        <p className="sb-section-item-paragraph">Embed your stories into Figma to cross-reference the design and live
+          implementation in one place.</p>
+        <a
+          href="https://storybook.js.org/docs/sharing/design-integrations#embed-storybook-in-figma-with-the-plugin"
+          target="_blank"
+        >Learn more<RightArrow /></a>
+      </div>
+      <div className="sb-grid-item">
+        <Image 
+          width={0}
+          height={0}
+          style={{ width: '100%', height: 'auto' }} 
+          src={Testing} 
+          alt="Screenshot of tests passing and failing" 
+        />
+        <h4 className="sb-section-item-heading">Testing</h4>
+        <p className="sb-section-item-paragraph">Use stories to test a component in all its variations, no matter how
+          complex.</p>
+        <a
+          href="https://storybook.js.org/docs/writing-tests"
+          target="_blank"
+        >Learn more<RightArrow /></a>
+      </div>
+      <div className="sb-grid-item">
+        <Image 
+          width={0}
+          height={0}
+          style={{ width: '100%', height: 'auto' }} 
+          src={Accessibility} 
+          alt="Screenshot of accessibility tests passing and failing" 
+        />
+        <h4 className="sb-section-item-heading">Accessibility</h4>
+        <p className="sb-section-item-paragraph">Automatically test your components for a11y issues as you develop.</p>
+        <a
+          href="https://storybook.js.org/docs/writing-tests/accessibility-testing"
+          target="_blank"
+        >Learn more<RightArrow /></a>
+      </div>
+      <div className="sb-grid-item">
+        <Image 
+          width={0}
+          height={0}
+          style={{ width: '100%', height: 'auto' }} 
+          src={Theming} 
+          alt="Screenshot of Storybook in light and dark mode" 
+        />
+        <h4 className="sb-section-item-heading">Theming</h4>
+        <p className="sb-section-item-paragraph">Theme Storybook's UI to personalize it to your project.</p>
+        <a
+          href="https://storybook.js.org/docs/configure/theming"
+          target="_blank"
+        >Learn more<RightArrow /></a>
+      </div>
+    </div>
+  </div>
+</div>
+<div className='sb-addon'>
+  <div className='sb-addon-text'>
+    <h4>Addons</h4>
+    <p className="sb-section-item-paragraph">Integrate your tools with Storybook to connect workflows.</p>
+    <a
+        href="https://storybook.js.org/integrations/"
+        target="_blank"
+      >Discover all addons<RightArrow /></a>
+  </div>
+  <div className='sb-addon-img'>
+    <Image 
+      width={650}
+      height={347}
+      src={AddonLibrary} 
+      alt="Integrate your tools with Storybook to connect workflows." 
+    />
+  </div>
+</div>
+
+<div className="sb-section sb-socials">
+    <div className="sb-section-item">
+      <Image 
+        width={32}
+        height={32}
+        layout="fixed"
+        src={Github} 
+        alt="Github logo" 
+        className="sb-explore-image"
+      />
+      Join our contributors building the future of UI development.
+
+      <a
+        href="https://github.com/storybookjs/storybook"
+        target="_blank"
+      >Star on GitHub<RightArrow /></a>
+    </div>
+    <div className="sb-section-item">
+      <Image 
+        width={33}
+        height={32}
+        layout="fixed"
+        src={Discord} 
+        alt="Discord logo" 
+        className="sb-explore-image"
+      />
+      <div>
+        Get support and chat with frontend developers.
+
+        <a
+          href="https://discord.gg/storybook"
+          target="_blank"
+        >Join Discord server<RightArrow /></a>
+      </div>
+    </div>
+    <div className="sb-section-item">
+      <Image 
+        width={32}
+        height={32}
+        layout="fixed"
+        src={Youtube} 
+        alt="Youtube logo" 
+        className="sb-explore-image"
+      />
+      <div>
+        Watch tutorials, feature previews and interviews.
+
+        <a
+          href="https://www.youtube.com/@chromaticui"
+          target="_blank"
+        >Watch on YouTube<RightArrow /></a>
+      </div>
+    </div>
+    <div className="sb-section-item">
+      <Image 
+        width={33}
+        height={32}
+        layout="fixed"
+        src={Tutorials} 
+        alt="A book" 
+        className="sb-explore-image"
+      />
+      <p>Follow guided walkthroughs on for key workflows.</p>
+
+      <a
+          href="https://storybook.js.org/tutorials/"
+          target="_blank"
+        >Discover tutorials<RightArrow /></a>
+    </div>
+</div>
+
+<style>
+  {`
+  .sb-container {
+    margin-bottom: 48px;
+  }
+
+  .sb-section {
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+  }
+
+  img {
+    object-fit: cover;
+  }
+
+  .sb-section-title {
+    margin-bottom: 32px;
+  }
+
+  .sb-section a:not(h1 a, h2 a, h3 a) {
+    font-size: 14px;
+  }
+
+  .sb-section-item, .sb-grid-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sb-section-item-heading {
+    padding-top: 20px !important;
+    padding-bottom: 5px !important;
+    margin: 0 !important;
+  }
+  .sb-section-item-paragraph {
+    margin: 0;
+    padding-bottom: 10px;
+  }
+
+  .sb-chevron {
+    margin-left: 5px;
+  }
+
+  .sb-features-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-gap: 32px 20px;
+  }
+
+  .sb-socials {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .sb-socials p {
+    margin-bottom: 10px;
+  }
+
+  .sb-explore-image {
+    max-height: 32px;
+    align-self: flex-start;
+  }
+
+  .sb-addon {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    position: relative;
+    background-color: #EEF3F8;
+    border-radius: 5px;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    background: #EEF3F8;
+    height: 180px;
+    margin-bottom: 48px;
+    overflow: hidden;
+  }
+
+  .sb-addon-text {
+    padding-left: 48px;
+    max-width: 240px;
+  }
+
+  .sb-addon-text h4 {
+    padding-top: 0px;
+  }
+
+  .sb-addon-img {
+    position: absolute;
+    left: 345px;
+    top: 0;
+    height: 100%;
+    width: 200%;
+    overflow: hidden;
+  }
+
+  .sb-addon-img img {
+    width: 650px;
+    transform: rotate(-15deg);
+    margin-left: 40px;
+    margin-top: -72px;
+    box-shadow: 0 0 1px rgba(255, 255, 255, 0);
+    backface-visibility: hidden;
+  }
+
+  @media screen and (max-width: 800px) {
+    .sb-addon-img {
+      left: 300px;
+    }
+  }
+
+  @media screen and (max-width: 600px) {
+    .sb-section {
+      flex-direction: column;
+    }
+
+    .sb-features-grid {
+      grid-template-columns: repeat(1, 1fr);
+    }
+
+    .sb-socials {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .sb-addon {
+      height: 280px;
+      align-items: flex-start;
+      padding-top: 32px;
+      overflow: hidden;
+    }
+
+    .sb-addon-text {
+      padding-left: 24px;
+    }
+
+    .sb-addon-img {
+      right: 0;
+      left: 0;
+      top: 130px;
+      bottom: 0;
+      overflow: hidden;
+      height: auto;
+      width: 124%;
+    }
+
+    .sb-addon-img img {
+      width: 1200px;
+      transform: rotate(-12deg);
+      margin-left: 0;
+      margin-top: 48px;
+      margin-bottom: -40px;
+      margin-left: -24px;
+    }
+  }
+  `}
+</style>
+
+================
+File: src/stories/header.css
+================
+.storybook-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 15px 20px;
+  font-family: 'Nunito Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+.storybook-header svg {
+  display: inline-block;
+  vertical-align: top;
+}
+
+.storybook-header h1 {
+  display: inline-block;
+  vertical-align: top;
+  margin: 6px 0 6px 10px;
+  font-weight: 700;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.storybook-header button + button {
+  margin-left: 10px;
+}
+
+.storybook-header .welcome {
+  margin-right: 10px;
+  color: #333;
+  font-size: 14px;
+}
+
+================
+File: src/stories/Header.stories.ts
+================
+import type { Meta, StoryObj } from '@storybook/react';
+import { Header } from './Header';
+
+const meta = {
+  title: 'Example/Header',
+  component: Header,
+  // This component will have an automatically generated Autodocs entry: https://storybook.js.org/docs/writing-docs/autodocs
+  tags: ['autodocs'],
+  parameters: {
+    // More on how to position stories at: https://storybook.js.org/docs/configure/story-layout
+    layout: 'fullscreen',
+  },
+} satisfies Meta<typeof Header>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+export const LoggedIn: Story = {
+  args: {
+    user: {
+      name: 'Jane Doe',
+    },
+  },
+};
+
+export const LoggedOut: Story = {};
+
+================
+File: src/stories/Header.tsx
+================
+import React from 'react';
+
+import { Button } from './Button';
+import './header.css';
+
+type User = {
+  name: string;
+};
+
+interface HeaderProps {
+  user?: User;
+  onLogin: () => void;
+  onLogout: () => void;
+  onCreateAccount: () => void;
+}
+
+export const Header = ({ user, onLogin, onLogout, onCreateAccount }: HeaderProps) => (
+  <header>
+    <div className="storybook-header">
+      <div>
+        <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+          <g fill="none" fillRule="evenodd">
+            <path
+              d="M10 0h12a10 10 0 0110 10v12a10 10 0 01-10 10H10A10 10 0 010 22V10A10 10 0 0110 0z"
+              fill="#FFF"
+            />
+            <path
+              d="M5.3 10.6l10.4 6v11.1l-10.4-6v-11zm11.4-6.2l9.7 5.5-9.7 5.6V4.4z"
+              fill="#555AB9"
+            />
+            <path
+              d="M27.2 10.6v11.2l-10.5 6V16.5l10.5-6zM15.7 4.4v11L6 10l9.7-5.5z"
+              fill="#91BAF8"
+            />
+          </g>
+        </svg>
+        <h1>Acme</h1>
+      </div>
+      <div>
+        {user ? (
+          <>
+            <span className="welcome">
+              Welcome, <b>{user.name}</b>!
+            </span>
+            <Button size="small" onClick={onLogout} label="Log out" />
+          </>
+        ) : (
+          <>
+            <Button size="small" onClick={onLogin} label="Log in" />
+            <Button primary size="small" onClick={onCreateAccount} label="Sign up" />
+          </>
+        )}
+      </div>
+    </div>
+  </header>
+);
+
+================
+File: src/stories/page.css
+================
+.storybook-page {
+  margin: 0 auto;
+  padding: 48px 20px;
+  max-width: 600px;
+  color: #333;
+  font-size: 14px;
+  line-height: 24px;
+  font-family: 'Nunito Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+.storybook-page h2 {
+  display: inline-block;
+  vertical-align: top;
+  margin: 0 0 4px;
+  font-weight: 700;
+  font-size: 32px;
+  line-height: 1;
+}
+
+.storybook-page p {
+  margin: 1em 0;
+}
+
+.storybook-page a {
+  color: inherit;
+}
+
+.storybook-page ul {
+  margin: 1em 0;
+  padding-left: 30px;
+}
+
+.storybook-page li {
+  margin-bottom: 8px;
+}
+
+.storybook-page .tip {
+  display: inline-block;
+  vertical-align: top;
+  margin-right: 10px;
+  border-radius: 1em;
+  background: #e7fdd8;
+  padding: 4px 12px;
+  color: #357a14;
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 12px;
+}
+
+.storybook-page .tip-wrapper {
+  margin-top: 40px;
+  margin-bottom: 40px;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.storybook-page .tip-wrapper svg {
+  display: inline-block;
+  vertical-align: top;
+  margin-top: 3px;
+  margin-right: 4px;
+  width: 12px;
+  height: 12px;
+}
+
+.storybook-page .tip-wrapper svg path {
+  fill: #1ea7fd;
+}
+
+================
+File: src/stories/Page.stories.ts
+================
+import type { Meta, StoryObj } from '@storybook/react';
+import { within, userEvent, expect } from '@storybook/test';
+
+import { Page } from './Page';
+
+const meta = {
+  title: 'Example/Page',
+  component: Page,
+  parameters: {
+    // More on how to position stories at: https://storybook.js.org/docs/configure/story-layout
+    layout: 'fullscreen',
+  },
+} satisfies Meta<typeof Page>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+export const LoggedOut: Story = {};
+
+// More on interaction testing: https://storybook.js.org/docs/writing-tests/interaction-testing
+export const LoggedIn: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const loginButton = canvas.getByRole('button', { name: /Log in/i });
+    await expect(loginButton).toBeInTheDocument();
+    await userEvent.click(loginButton);
+    await expect(loginButton).not.toBeInTheDocument();
+
+    const logoutButton = canvas.getByRole('button', { name: /Log out/i });
+    await expect(logoutButton).toBeInTheDocument();
+  },
+};
+
+================
+File: src/stories/Page.tsx
+================
+import React from 'react';
+
+import { Header } from './Header';
+import './page.css';
+
+type User = {
+  name: string;
+};
+
+export const Page: React.FC = () => {
+  const [user, setUser] = React.useState<User>();
+
+  return (
+    <article>
+      <Header
+        user={user}
+        onLogin={() => setUser({ name: 'Jane Doe' })}
+        onLogout={() => setUser(undefined)}
+        onCreateAccount={() => setUser({ name: 'Jane Doe' })}
+      />
+
+      <section className="storybook-page">
+        <h2>Pages in Storybook</h2>
+        <p>
+          We recommend building UIs with a{' '}
+          <a href="https://componentdriven.org" target="_blank" rel="noopener noreferrer">
+            <strong>component-driven</strong>
+          </a>{' '}
+          process starting with atomic components and ending with pages.
+        </p>
+        <p>
+          Render pages with mock data. This makes it easy to build and review page states without
+          needing to navigate to them in your app. Here are some handy patterns for managing page
+          data in Storybook:
+        </p>
+        <ul>
+          <li>
+            Use a higher-level connected component. Storybook helps you compose such data from the
+            "args" of child component stories
+          </li>
+          <li>
+            Assemble data in the page component from your services. You can mock these services out
+            using Storybook.
+          </li>
+        </ul>
+        <p>
+          Get a guided tutorial on component-driven development at{' '}
+          <a href="https://storybook.js.org/tutorials/" target="_blank" rel="noopener noreferrer">
+            Storybook tutorials
+          </a>
+          . Read more in the{' '}
+          <a href="https://storybook.js.org/docs" target="_blank" rel="noopener noreferrer">
+            docs
+          </a>
+          .
+        </p>
+        <div className="tip-wrapper">
+          <span className="tip">Tip</span> Adjust the width of the canvas with the{' '}
+          <svg width="10" height="10" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">
+            <g fill="none" fillRule="evenodd">
+              <path
+                d="M1.5 5.2h4.8c.3 0 .5.2.5.4v5.1c-.1.2-.3.3-.4.3H1.4a.5.5 0 01-.5-.4V5.7c0-.3.2-.5.5-.5zm0-2.1h6.9c.3 0 .5.2.5.4v7a.5.5 0 01-1 0V4H1.5a.5.5 0 010-1zm0-2.1h9c.3 0 .5.2.5.4v9.1a.5.5 0 01-1 0V2H1.5a.5.5 0 010-1zm4.3 5.2H2V10h3.8V6.2z"
+                id="a"
+                fill="#999"
+              />
+            </g>
+          </svg>
+          Viewports addon in the toolbar
+        </div>
+      </section>
+    </article>
+  );
+};
+
+================
 File: src/styles/globals.css
 ================
 @tailwind base;
@@ -1285,7 +2536,8 @@ const config = {
   "extends": [
     "next/core-web-vitals",
     "plugin:@typescript-eslint/recommended-type-checked",
-    "plugin:@typescript-eslint/stylistic-type-checked"
+    "plugin:@typescript-eslint/stylistic-type-checked",
+    "plugin:storybook/recommended"
   ],
   "rules": {
     "@typescript-eslint/array-type": "off",
@@ -1315,6 +2567,11 @@ const config = {
   }
 }
 module.exports = config;
+
+================
+File: .eslintrc.json
+================
+
 
 ================
 File: .gitignore
@@ -1365,6 +2622,17 @@ yarn-error.log*
 
 # idea files
 .idea
+*storybook.log
+
+================
+File: .prettierignore
+================
+
+
+================
+File: .prettierrc
+================
+
 
 ================
 File: components.json
@@ -1390,6 +2658,40 @@ File: components.json
   },
   "iconLibrary": "lucide"
 }
+
+================
+File: jest.config.ts
+================
+import type { Config } from 'jest';
+import nextJest from 'next/jest.js';
+
+const createJestConfig = nextJest({
+  // Provide the path to your Next.js app to load next.config.js and .env files in your test environment
+  dir: './',
+});
+
+// Add any custom config to be passed to Jest
+const config: Config = {
+  coverageProvider: 'v8',
+  testEnvironment: 'jsdom',
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+  moduleNameMapper: {
+    '^~/(.*)$': '<rootDir>/src/$1',
+  },
+};
+
+// createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async
+export default createJestConfig(config);
+
+================
+File: jest.setup.ts
+================
+import '@testing-library/jest-dom';
+
+================
+File: lint-staged.config.js
+================
+
 
 ================
 File: next.config.js
@@ -1428,18 +2730,23 @@ File: package.json
     "lint:fix": "next lint --fix",
     "preview": "next build && next start",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.2",
     "@prisma/client": "^5.14.0",
     "@radix-ui/react-scroll-area": "^1.2.3",
+    "@radix-ui/react-slot": "^1.0.2",
     "@t3-oss/env-nextjs": "^0.10.1",
     "@tanstack/react-query": "^5.50.0",
     "@trpc/client": "^11.0.0-rc.446",
     "@trpc/react-query": "^11.0.0-rc.446",
     "@trpc/server": "^11.0.0-rc.446",
-    "class-variance-authority": "^0.7.1",
+    "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "geist": "^1.3.0",
     "lucide-react": "^0.475.0",
@@ -1454,7 +2761,21 @@ File: package.json
     "zod": "^3.23.3"
   },
   "devDependencies": {
+    "storybook": "^8.0.0",
+    "@storybook/addon-essentials": "^8.0.0",
+    "@storybook/addon-interactions": "^8.0.0",
+    "@storybook/addon-onboarding": "^8.0.0",
+    "@storybook/blocks": "^8.0.0",
+    "@storybook/nextjs": "^8.0.0",
+    "@storybook/react": "^8.0.0",
+    "@storybook/test": "^8.0.0",
+    "@storybook/manager-api": "^8.0.0",
+    "@storybook/preview-api": "^8.0.0",
+    "@testing-library/jest-dom": "^6.4.2",
+    "@testing-library/react": "^14.2.1",
+    "@testing-library/user-event": "^14.5.2",
     "@types/eslint": "^8.56.10",
+    "@types/jest": "^29.5.12",
     "@types/node": "^20.14.10",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
@@ -1462,6 +2783,9 @@ File: package.json
     "@typescript-eslint/parser": "^8.1.0",
     "eslint": "^8.57.0",
     "eslint-config-next": "^15.0.1",
+    "eslint-plugin-storybook": "^0.11.3",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
     "postcss": "^8.4.39",
     "prettier": "^3.3.2",
     "prettier-plugin-tailwindcss": "^0.6.5",
@@ -1493,240 +2817,176 @@ export default {
 };
 
 ================
-File: prompt_plan.md
+File: prompt-plan.md
 ================
-# **REVISED PROJECT BLUEPRINT - FRONTEND FIRST APPROACH**
+# Test-Driven Implementation Prompts for AI Chat Interface
 
-## **Phase 1: Project Setup & Storybook**
+## **Phase 1: Project Setup & Infrastructure**
 
-1. **Initialize Project**
-   - Create Next.js + TypeScript project
-   - Configure ESLint, Prettier, Jest
-   - Set up basic CI/CD
-   - Deploy "Hello World" to Vercel
+### **1. Initialize the Next.js Project**
+```text
+You are a React and Next.js expert. Set up a new Next.js project with TypeScript.
 
-2. **Storybook Setup**
-   - Install and configure Storybook
-   - Set up design tokens (colors, typography, spacing)
-   - Create documentation template
-   - Add testing addons for accessibility and interactions
+Requirements:
+- Initialize a Next.js project (`npx create-next-app@latest --typescript`)
+- Configure ESLint, Prettier, and Husky for consistent formatting and linting.
+- Install Tailwind CSS and set up global styles.
+- Set up a clean folder structure: `components/`, `hooks/`, `utils/`, `pages/`, `styles/`.
+- Verify that `npm run dev` starts the project without errors.
 
-3. **Core Components**
-   - Build and document atomic components:
-     - Buttons (Primary, Secondary, Connect Wallet)
-     - Input fields
-     - Cards (Property, User)
-     - Navigation elements
-     - Modal windows
-   - Write component tests
-   - Create Storybook stories for each
+Test Cases:
+- Ensure Next.js builds successfully.
+- Verify that ESLint and Prettier enforce code standards.
+- Confirm Tailwind CSS is applied correctly.
+```
 
-## **Phase 2: Page Layout & Routes**
+### **2. Configure Jotai for Global State Management**
+```text
+You are an expert in state management. Implement Jotai for managing global state in a Next.js project.
 
-1. **Route Structure**
-   - Set up Next.js pages:
-     - Home/Landing
-     - Property Listings
-     - Property Detail
-     - User Dashboard
-     - Seller Dashboard
-     - Authentication pages
+Requirements:
+- Install Jotai (`npm install jotai`).
+- Create atoms for chat history, API keys, and UI settings.
+- Implement a `useChatState` hook to manage chat messages.
+- Store chat history in local storage for session persistence.
 
-2. **Layout Components**
-   - Header with navigation
-   - Footer
-   - Sidebar (where needed)
-   - Responsive layouts
-   - Document in Storybook
+Test Cases:
+- Ensure chat history is stored in and retrieved from local storage.
+- Verify UI state updates reactively when atoms change.
+- Confirm API keys are securely handled in state.
+```
 
-3. **Navigation Flow**
-   - Implement client-side routing
-   - Loading states
-   - Error boundaries
-   - 404 page
+## **Phase 2: Core Chat System**
 
-## **Phase 3: Feature Components with Mock Data**
+### **3. Implement Chat Input & Keyboard Shortcuts**
+```text
+You are an expert in UI and keyboard interactions. Create a chat input component with keyboard shortcuts.
 
-1. **Property Listing Components**
-   - Property grid/list view
-   - Search filters
-   - Map view placeholder
-   - Sort/filter UI
-   - Mock data structure
+Requirements:
+- Implement an input box for user prompts.
+- Support `Enter` to send messages and `Shift+Enter` for multi-line input.
+- Add a global shortcut (`Cmd+/` or `/`) to focus the input box.
 
-2. **Property Detail Components**
-   - Image gallery
-   - 3D viewer placeholder
-   - Property details section
-   - "Buy Now" flow UI
-   - Contact forms
+Test Cases:
+- Ensure pressing `Enter` submits messages.
+- Verify `Shift+Enter` allows multi-line input.
+- Confirm `/` brings focus to the input field.
+```
 
-3. **User Features**
-   - Authentication UI flows
-   - Profile settings
-   - Favorites system
-   - Notifications panel
+### **4. Set Up Multi-Column Layout for LLM Responses**
+```text
+You are an expert in responsive UI design. Implement a multi-column layout using Tailwind CSS.
 
-4. **Seller Features**
-   - Property creation form
-   - Dashboard stats (with mock data)
-   - Listing management UI
-   - Boost listing interface
+Requirements:
+- Display LLM responses in separate columns (ChatGPT, Claude, DeepSeek).
+- Ensure mobile view collapses into a single-column layout.
+- Implement a toggle to switch between LLMs in mobile view.
 
-## **Phase 4: Interactive Features (Still with Mock Data)**
+Test Cases:
+- Verify correct column layout on desktop.
+- Ensure mobile mode switches to a single-column with a toggle.
+- Confirm smooth animations between layout changes.
+```
 
-1. **3D Viewer Integration**
-   - Implement Three.js viewer
-   - Controls for exterior/interior
-   - Loading states
-   - Fallback views
+## **Phase 3: API Integration & Response Handling**
 
-2. **Map Implementation**
-   - Integrate Deck.gl + Google Maps
-   - Property markers
-   - Search by location
-   - Interactive filters
+### **5. Implement API Request Handling**
+```text
+You are an expert in API integrations. Implement API request handling for multiple LLMs.
 
-3. **Wallet Connection UI**
-   - Phantom wallet connect flow
-   - Transaction simulation
-   - Error states
-   - Success/failure modals
+Requirements:
+- Create a modular function to send prompts to ChatGPT, Claude, and DeepSeek.
+- Implement error handling for invalid API responses.
+- Allow user-provided API keys to be stored securely.
 
-## **Phase 5: State Management & Data Flow**
+Test Cases:
+- Verify API calls return expected responses.
+- Ensure errors are caught and displayed properly.
+- Confirm API keys are securely stored and retrieved.
+```
 
-1. **Frontend State**
-   - Set up state management (Redux/Zustand)
-   - Define data models
-   - Create actions/reducers
-   - Implement local storage
+### **6. Implement Streaming Response Handling**
+```text
+You are an expert in real-time UX. Implement streaming response handling for LLMs.
 
-2. **Mock API Layer**
-   - Create API interfaces
-   - Mock response data
-   - Error handling
-   - Loading states
+Requirements:
+- Display partial responses as they arrive.
+- Ensure responses appear incrementally for a smooth experience.
+- Optimize performance for handling long responses.
 
-## **Phase 6: Backend Integration**
+Test Cases:
+- Verify real-time streaming works for all LLMs.
+- Ensure UI updates smoothly without freezing.
+- Confirm large responses are handled efficiently.
+```
 
-1. **Database & tRPC**
-   - Set up PostgreSQL
-   - Configure tRPC
-   - Replace mock data gradually
-   - Update tests
+## **Phase 4: UX Enhancements & Performance Optimizations**
 
-2. **Authentication**
-   - Implement real wallet connection
-   - Add Google/Apple auth
-   - Session management
-   - Update relevant components
+### **7. Implement Error Handling & Status Indicators**
+```text
+You are an expert in error handling. Implement UI indicators for API failures and system status.
 
-3. **Property Management**
-   - Real database operations
-   - Image/file uploads
-   - Search/filter implementation
-   - Update Storybook examples
+Requirements:
+- Display inline error messages when an API request fails.
+- Implement a real-time status indicator for each LLM.
+- Add a retry button for failed requests.
 
-## **Phase 7: Blockchain Integration**
+Test Cases:
+- Verify errors appear correctly in the chat UI.
+- Ensure the status indicator updates dynamically.
+- Confirm retry functionality works.
+```
 
-1. **Smart Contracts**
-   - Implement Solana contracts
-   - Connect to frontend
-   - Test transactions
-   - Update UI states
+### **8. Implement Auto-Collapse for Long Responses**
+```text
+You are an expert in UI behavior. Implement auto-collapsing for long responses.
 
-2. **NFT Features**
-   - Implement minting
-   - IPFS storage
-   - Update property status
-   - Transaction history
+Requirements:
+- Collapse responses longer than 500 words.
+- Add a "Show More" button for expanding messages.
+- Ensure smooth animations when expanding/collapsing.
 
-## **Phase 8: Final Features**
+Test Cases:
+- Verify long responses are collapsed by default.
+- Ensure expanding responses works correctly.
+- Confirm smooth animations without performance issues.
+```
 
-1. **Notifications**
-   - Real-time updates
-   - Email integration
-   - Push notifications
-   - Update UI components
+## **Final Phase: Deployment & Maintenance**
 
-2. **Social Features**
-   - Share functionality
-   - Social previews
-   - 3D snapshots
+### **9. Implement Authentication & API Key Management**
+```text
+You are an expert in authentication. Implement Clerky for user sign-in and API key management.
 
-## **Phase 9: Testing & Documentation**
+Requirements:
+- Integrate Clerky for authentication.
+- Store user API keys securely.
+- Implement a minimal settings panel for managing API keys.
 
-1. **Testing**
-   - E2E tests
-   - Integration tests
-   - Performance testing
-   - Security audit
+Test Cases:
+- Verify users can sign in successfully.
+- Ensure API keys are encrypted and stored securely.
+- Confirm settings updates persist across sessions.
+```
 
-2. **Documentation**
-   - Update Storybook
-   - API documentation
-   - Deployment guides
-   - User documentation
+### **10. Final Testing & Deployment**
+```text
+You are an expert in testing and deployment. Ensure the app is production-ready.
 
-## **Phase 10: Production Release**
+Requirements:
+- Conduct full UI/UX testing across devices.
+- Optimize performance and ensure no memory leaks.
+- Deploy the app using Vercel with auto-updates enabled.
 
-1. **Optimization**
-   - Performance optimization
-   - Bundle size reduction
-   - Image optimization
-   - Loading strategies
-
-2. **Deployment**
-   - Staging deployment
-   - Production checklist
-   - Monitoring setup
-   - Launch
+Test Cases:
+- Verify all core functionalities work as expected.
+- Confirm smooth performance and animations.
+- Ensure deployment is seamless with no runtime errors.
+```
 
 ---
 
-# **PROMPTS FOR IMPLEMENTATION**
-
-Here's a sample of how the prompts would change to reflect this frontend-first approach:
-
-### **Prompt 1: Project Setup**
-```text
-Let's set up a Next.js project with TypeScript, including:
-1. ESLint and Prettier configuration
-2. Jest and React Testing Library
-3. Basic GitHub Actions
-4. Storybook installation and configuration
-5. Initial design tokens (colors, typography)
-
-Please provide the complete setup code and configuration files.
-```
-
-### **Prompt 2: Core Components**
-```text
-We need to create and document our core components:
-1. Create a Button component with variants
-2. Set up its Storybook story
-3. Write component tests
-4. Add accessibility checks
-5. Document props and usage
-
-Please provide the component code, story, and tests.
-```
-
-[Continue with similar prompts for each phase...]
-
-The key differences in this approach are:
-1. Frontend components are built and documented first
-2. All features start with mock data
-3. Storybook documentation is a first-class citizen
-4. Backend integration happens only after UI is solid
-5. Each component is fully documented before moving on
-
-This approach allows for:
-- Faster visual feedback
-- Better component documentation
-- Easier UI testing and iteration
-- Clear separation of concerns
-- More maintainable codebase
+This structured set of **test-driven development prompts** ensures **incremental progress, best practices, and robust testing at every stage**. Each prompt builds upon the previous, **avoiding orphaned or unused code**. 🚀 Let me know if you'd like any refinements!
 
 ================
 File: README.md
@@ -1764,182 +3024,145 @@ Follow our deployment guides for [Vercel](https://create.t3.gg/en/deployment/ver
 ================
 File: spec.md
 ================
-**Niseko Real Estate Platform - Developer Specification**
+AI-Assisted Writing & Code Generation Chat Interface
 
-## **1. Overview**
+Overview
 
-A web-based platform that allows international buyers to browse, inquire, and purchase homes in Niseko, Japan, with **Solana (SOL) or USDC** via **Phantom Wallet**. The app integrates **3D property renderings**, **legal verification automation**, and **NFT-based property ownership proof**. Sellers can list properties, manage inquiries, and track listing performance.
+This document provides a comprehensive specification for a web-based AI chat interface that allows users to interact with multiple Large Language Models (LLMs) in parallel, with responses displayed in a TweetDeck-style multi-column layout.
 
----
+Core Features
 
-## **2. Core Features & Requirements**
+Multi-LLM Unified Chat: Users send a single prompt, and all predefined LLMs respond within separate columns.
 
-### **2.1. User Authentication & Access**
+Streaming Responses: Partial responses appear as they arrive, similar to ChatGPT.
 
-- **Login Methods:**
-  - Phantom Wallet (default for buyers)
-  - Google/Apple login (alternative for non-crypto users)
-  - Guest mode (browse homes & favorite listings without login)
-- **Security:**
-  - Wallet login is deemed sufficient; no multi-factor authentication (MFA)
-  - Automatic logout for inactive wallet connections
-- **Multi-device support:** Wallet users sync across devices
+Keyboard Shortcuts:
 
-### **2.2. Property Browsing & Search**
+Cmd+/ or / to focus the input box.
 
-- **3D Interactive Property Models:**
-  - Rendered using **Three.js**
-  - Toggle between exterior & interior views
-  - Clickable annotations for property features (e.g., "Heated floors")
-  - Snapshot & social sharing (Twitter/iMessage/Instagram Stories)
-- **Map & List View:**
-  - **Deck.gl + Google Maps 3D** integration
-  - Toggle between **map mode & list/grid format**
-  - Map layers: **Ski lifts, terrain elevation, restaurants & amenities, snowfall conditions**
-- **Filters & Search:**
-  - Price range, number of bedrooms/bathrooms, property size
-  - Search by location (e.g., "Upper Hirafu")
-- **Favorite Listings:**
-  - Saved locally for guest users, synced for logged-in users
-  - "Recently Viewed" & "Trending Properties" sections
+Enter to send messages, Shift+Enter for multi-line input.
 
-### **2.3. Purchasing Process**
+Cmd+1, Cmd+2, etc., to resend the last prompt to specific LLMs.
 
-- **Instant "Buy Now" Transaction:**
-  - **Crypto Payment Options:** SOL auto-converts to USDC
-  - **Escrow Smart Contract:** Funds held until legal approval
-  - **Live Price Conversion:** USD/SOL/USDC exchange rate displayed before checkout
-- **Legal Verification:**
-  - **Automated API review** with fallback to a human lawyer
-  - Legal documents generated via Dropbox Sign API
-  - KYC required before transaction finalization
-  - NFT-based property deed stored on IPFS
-- **No Refund Policy:** Once the smart contract executes, all sales are final
+Multi-Column Layout: Responses from each LLM appear in independent columns, stacked horizontally.
 
-### **2.4. Ownership & Documentation**
+Mobile-Friendly Adaptation: On smaller screens, columns collapse into a single-column layout with a toggle to switch between LLMs.
 
-- **Secure Document Storage:**
-  - Legal documents stored in **AWS S3/Firebase** for easy access
-  - NFT metadata (including property details & ownership proof) stored on **IPFS**
-- **User Access to Legal Docs:**
-  - Download all documents as a zip file
-  - Legal verification status updates with push notifications
+Persistent Local History: Chat sessions persist in local storage and reload automatically upon reopening the app.
 
-### **2.5. Seller Features**
+Manual Session Reset: Users can clear the current conversation and start fresh using a "New Chat" button.
 
-- **Seller Dashboard:**
-  - Listing performance metrics (views, favorites, inquiries, video calls)
-  - "Boost Listing" (paid feature) to promote homes in "Trending Properties"
-  - "Recommended Price" feature based on market insights
-  - Option to **pause listings** (e.g., "Not accepting inquiries now")
-- **Buyer Communication:**
-  - Email inquiries & **video calls via the app**
-  - AI auto-replies for common questions
-  - Sellers can block unwanted buyers
+Fixed Set of LLMs: Only predefined models (e.g., ChatGPT, Claude, DeepSeek) are available.
 
-### **2.6. Notifications & Alerts**
+User-Provided API Keys: Users must enter API keys for each LLM in the settings panel.
 
-- **Push Notifications for:**
-  - Transaction updates (e.g., "Purchase under review")
-  - Seller inquiries & video call requests
-  - Weekly/monthly market trend reports
-- **Email Notifications:**
-  - Property listing performance reports
-  - Legal document availability & ownership confirmation
-- **Users can customize notification settings**
+1 Free Query per Day: Each signed-in user gets one free request before requiring their API key.
 
-### **2.7. Social Sharing & Marketing**
+Dark & Light Mode Toggle: Users can switch between themes.
 
-- **Snapshot & Share:**
-  - Users can take & share **multi-angle 3D property snapshots**
-  - Auto-generated captions for **Twitter, Instagram Stories, iMessage**
-  - "Copy Link" button for manual sharing
+Error Handling: Inline error messages display API failures and rate limits next to the affected LLM’s response.
 
----
+Status Indicator: A banner shows real-time API status for each LLM.
 
-## **3. Technical Architecture**
+Loading Indicators: Spinners show when LLM responses are being processed.
 
-### **3.1. Tech Stack**
+Auto-Collapse Long Responses: Responses exceeding 500 words are collapsed with a “Show More” button.
 
-- **Frontend:** Next.js (React, TypeScript), Three.js, Deck.gl
-- **Backend:** **tRPC (TypeScript-based API framework), Node.js**
-- **Deployment:** **Vercel for frontend & backend hosting**
-- **Database:** PostgreSQL (property listings, user data), Redis (caching)
-- **Web3 Integration:** Solana, Phantom Wallet, NFT smart contracts (Rust)
-- **Storage:** AWS S3/Firebase (legal docs), IPFS (NFT metadata)
-- **APIs:** Google Maps, Dropbox Sign, Solana price conversion
+Fluid Animations: Smooth scrolling, sliding panels, and micro-interactions enhance usability.
 
-### **3.2. Smart Contract Design**
+Bottom Navigation Bar (Mobile): Allows quick access to chat and settings.
 
-- **Escrow Mechanism:**
-  - Buyer funds held in escrow (USDC) until legal verification completes
-  - Smart contract releases funds & transfers NFT upon approval
-- **NFT Metadata Structure:**
-  ```json
-  {
-    "name": "Niseko Ski Home #123",
-    "description": "Luxury ski-in/ski-out home in Upper Hirafu.",
-    "image": "ipfs://...",
-    "attributes": {
-      "location": "Niseko, Japan",
-      "property_size": "250 sqm",
-      "bedrooms": 4,
-      "bathrooms": 3,
-      "ownership_status": "Owned by Wallet Address",
-      "legal_documents": "ipfs://..."
-    }
-  }
-  ```
+Auto-Recovery: If the app crashes or refreshes, the last session is restored.
 
----
+No Data Storage on Server: All conversations remain on the client side, ensuring privacy.
 
-## **4. Error Handling & Security**
+Minimal Settings Panel: Only essential options (API keys, theme toggle) are included.
 
-- **KYC Verification Failures:** Display rejection reason, allow resubmission
-- **Transaction Errors:** Show fallback error messages (e.g., "Payment failed, try again")
-- **Rate Limiting:** Prevent spam listings & automated bot activity
-- **Secure API Communication:** Use OAuth & Web3 authentication
-- **Auto-Logout:** Disconnect Phantom Wallet after inactivity
+Clickable Links: URLs in responses are automatically detected and formatted.
 
----
+Lite Mode Toggle: Disables animations and reduces UI complexity for low-performance devices.
 
-## **5. Testing Plan**
+Silent Auto-Updates: The app always loads the latest version without notifying users.
 
-### **5.1. Unit Testing**
+Technical Architecture
 
-- Web3 smart contract functionality (Solana transactions, escrow logic)
-- Legal API automation workflows (edge cases for verification failures)
-- 3D rendering performance (lazy-loading, annotation interactions)
+Frontend:
 
-### **5.2. Integration Testing**
+Framework: React (Next.js for SSR optimization)
 
-- **Frontend-Backend Communication:** Next.js API calls to tRPC backend
-- **Crypto Payments:** End-to-end Solana transactions with escrow contract
-- **Legal Verification:** Automated API handling & Dropbox Sign document signing
+State Management: React Context API / jotai
 
-### **5.3. Performance Testing**
+Styling: Tailwind CSS, shadcn for components
 
-- Map rendering optimizations (Deck.gl & Google Maps layers)
-- 3D model async loading under various network conditions
+Animations: Framer Motion
 
-### **5.4. Security Testing**
+Local Storage: Browser localStorage for persisting sessions
 
-- Web3 wallet security (ensure only owner can view NFT ownership details)
-- SQL injection prevention for buyer/seller input fields
-- Rate-limiting & bot prevention on property listings
+Backend:
 
----
+No Backend: The app runs fully client-side, relying on user-provided API keys.
+in the future, add trpc, prisma, supabase for backend
 
-## **6. Deployment Strategy**
+Clerky for Authentication: Handles user sign-in and API key storage in local settings.
 
-- **Hosting:** Full-stack deployment on **Vercel**
-- **Staging Environment:** Firebase & Solana testnet before live deployment
-- **CI/CD Pipeline:** GitHub Actions for automated testing & deployment
-- **Monitoring:** Cloudflare for DDoS protection, LogRocket for user session monitoring
+Minimal Analytics: Collects only anonymous usage data, session sign in, excluding chat content. Use posthog for analytics
 
----
+Data Handling & Privacy
 
-This document serves as a **developer-ready specification** for building the Niseko real estate platform. 🚀
+Local Storage:
+
+Stores session history and user API keys.
+use Jotai for state management.
+
+No syncing across devices.
+
+Error Handling:
+
+Displays inline errors for API failures.
+
+No retries; users see an error message if a request fails.
+
+Session Persistence:
+
+Last session automatically reloads.
+
+Independent chat sessions per tab.
+
+Testing Plan
+
+Functional Tests:
+
+Verify multi-column LLM responses load correctly.
+
+Ensure keyboard shortcuts work as expected.
+
+Test API key input and usage tracking.
+
+Validate persistent history and manual session reset.
+
+UI/UX Tests:
+
+Responsive layout across desktop, tablet, and mobile.
+
+Smooth animations and transitions.
+
+Proper display of error messages and status indicators.
+
+Performance Tests:
+
+Ensure large responses render progressively.
+
+Optimize for low-performance devices via Lite Mode.
+
+Security Tests:
+
+Validate API keys are stored securely on the client side.
+
+Ensure no user data is transmitted or stored on a server.
+
+Conclusion
+
+This specification outlines the full functionality, technical architecture, and implementation strategy for a streamlined multi-LLM chat interface. With a focus on simplicity, client-side execution, and a user-friendly experience, the project is ready for development.
 
 ================
 File: start-database.sh
